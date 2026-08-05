@@ -1,0 +1,42 @@
+#
+# Calling SNPs
+#
+
+APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
+
+OUTDIR="snp_calling"
+THREADS=$(({{CORES}}/4))
+set -euo pipefail
+
+#convert sam files (suffixed with .bwa which was my method to distinguish from other aligners)
+mkdir {{PROJECTDIR}}/${OUTDIR}
+find {{PROJECTDIR}}/bwa_align -name "*.bwa" | \
+$APPTAINER_SNP parallel -j $THREADS --env OUTDIR '
+sample=$(basename {} .bwa)
+
+$APPTAINER_SNP samtools view -@ 4 -bS {} | $APPTAINER_SNP samtools sort -@ 4 -o {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
+
+$APPTAINER_SNP samtools index -@ 4 {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
+'
+
+#create a BAM list
+find "{{PROJECTDIR}}/${OUTDIR}" -name "*.bam" | sort > "{{PROJECTDIR}}/bam_list.txt"
+
+#call variants jointly
+$APPTAINER_SNP bcftools mpileup \
+    --threads {{CORES}} \
+    -Ou \
+    -a FORMAT/DP,FORMAT/AD \
+    -f "{{REFGENOME}}" \
+    -b "{{PROJECTDIR}}/bam_list.txt" | \
+$APPTAINER_SNP bcftools call \
+    --threads {{CORES}} \
+    -mv \
+    -f GQ,GP \
+    -Ob | \
+$APPTAINER_SNP bcftools view \
+    -Oz \
+    -o "{{PROJECTDIR}}/${OUTDIR}/variants.vcf.gz"
+
+#index vcf
+$APPTAINER_SNP bcftools index -t "{{PROJECTDIR}}/${OUTDIR}/variants.vcf.gz"

@@ -1,0 +1,58 @@
+#
+# SNP Filtering (Pre-Imputation)
+#
+
+APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
+
+INPUT_VCF="{{PROJECTDIR}}/snp_calling/variants.vcf.gz"
+SNP_VCF="{{PROJECTDIR}}/snp_processing/snp_unfiltered.vcf.gz"
+INDEL_VCF="{{PROJECTDIR}}/snp_processing/indel_unfiltered.vcf.gz"
+FILT_VCF="{{PROJECTDIR}}/snp_processing/snp_filtered_preimputation.vcf.gz"
+
+#create folder to store processed vcf files
+mkdir {{PROJECTDIR}}/snp_processing
+
+get just SNPs (remove indels and structural variants)
+$APPTAINER_SNP bcftools view "$INPUT_VCF" \
+    --threads {{CORES}} \
+    --types snps \
+    -O z9 \
+    -o "$SNP_VCF"
+
+$APPTAINER_SNP bcftools index -f "$SNP_VCF"
+
+#get just INDELs (remove SNPs and structural variants)
+$APPTAINER_SNP bcftools view "$INPUT_VCF" \
+    --threads {{CORES}} \
+    --types indels \
+    -O z9 \
+    -o "$INDEL_VCF"
+
+$APPTAINER_SNP bcftools index -f "$INDEL_VCF"
+
+#mask low-depth low-quality genotypes
+$APPTAINER_SNP bcftools +setGT \
+    "$SNP_VCF" \
+    --threads {{CORES}} \
+    -O z9 \
+    -o "$MASKED_VCF" \
+    -- \
+    -t q \
+    -n . \
+    -i 'FMT/DP<{{DP}} || FMT/GQ<{{GQ}}'
+
+$APPTAINER_SNP bcftools index -f "$MASKED_VCF"
+
+#remove low quality, high missingness, multiallelic, and invariant SNPs
+$APPTAINER_SNP bcftools +fill-tags "$MASKED_VCF" \
+    --threads {{CORES}} \
+    -- -t F_MISSING,AC,AN | \
+$APPTAINER_SNP bcftools view \
+    --threads {{CORES}} \
+    --min-alleles 2 \
+    --max-alleles 2 \
+    -i 'QUAL>={{QUAL}} && F_MISSING<={{F_MISSING}} && MAC>{{MAC}}' \
+    -O z9 \
+    -o "$FILT_VCF"
+
+$APPTAINER_SNP bcftools index -f "$FILT_VCF"

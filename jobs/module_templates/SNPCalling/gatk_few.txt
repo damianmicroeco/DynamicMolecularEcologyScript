@@ -1,0 +1,65 @@
+#
+# Calling SNPs
+#
+
+APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
+
+#Index fasta genome, and create dictionary. It is simpler if we copy the genome to our project directory and make the dictionary in the same place
+mkdir {{PROJECTDIR}}/genome_dictionary
+cp {{REFGENOME}} {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
+
+$APPTAINER_SNP samtools faidx {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
+$APPTAINER_SNP gatk CreateSequenceDictionary \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+	-O {{PROJECTDIR}}/genome_dictionary/reference_genome.dict
+
+#Iterate through bam files, add sample names, and call variants
+mkdir {{PROJECTDIR}}/snp_calling
+while IFS=$'\t' read -ra col
+	do
+		echo "${col[2]}"
+		$APPTAINER_SNP gatk AddOrReplaceReadGroups \
+			-I {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa \
+			-O {{PROJECTDIR}}/snp_calling/${col[2]}_withsm.bam \
+			-RGSM ${col[2]} \
+			-RGPU unit1 \
+			-RGPL ILLUMINA \
+			-RGLB ${col[2]} \
+			-SO coordinate
+		$APPTAINER_SNP gatk GetSampleName \
+			-I {{PROJECTDIR}}/snp_calling/${col[2]}_withsm.bam \
+			-O {{PROJECTDIR}}/snp_calling/${col[2]}_withsm.txt
+		
+		#index bam files that have had sample names added
+		$APPTAINER_SNP samtools index -@ {{CORES}} {{PROJECTDIR}}/snp_calling/${col[2]}_withsm.bam
+
+		#Call SNPs
+		$APPTAINER_SNP gatk HaplotypeCaller \
+			-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+			--java-options "-Xmx{{MAXRAM}}g" \
+			-I {{PROJECTDIR}}/snp_calling/${col[2]}_withsm.bam \
+			-O {{PROJECTDIR}}/snp_calling/${col[2]}.g.vcf.gz \
+			--native-pair-hmm-threads {{CORES}} \
+			-ploidy 2 \
+			-ERC GVCF
+	done < {{PROJECTDIR}}/bwa_manifest.txt
+
+#create gvcf list
+find {{PROJECTDIR}}/snp_calling/ -type f -name "*.g.vcf.gz" > {{PROJECTDIR}}/snp_calling/gvcf_list.txt
+
+###### NOTE: For more than 20 samples consider using GenomicsDBImport. The GATK (Many) mode will replicate this code while using a GenomicsDBImport. ######
+###### Please be aware that if you are going to use GenomicsDBImport, you want an almost completely assembled genome with few scaffolds because the GATK (Many) mode splits the vcf files by chromosome/scaffold ######
+
+#Combine the VCF files
+$APPTAINER_SNP gatk CombineGVCFs \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+	$(sed "s/^/-V /" {{PROJECTDIR}}/snp_calling/gvcf_list.txt) \
+	-O {{PROJECTDIR}}/snp_calling/combined.vcf
+
+#Add genotypes to VCF file
+$APPTAINER_SNP gatk --java-options "-Xmx{{MAXRAM}}g" GenotypeGVCFs \
+   -R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+   -V {{PROJECTDIR}}/snp_calling/combined.vcf \
+   -O {{PROJECTDIR}}/snp_calling/variants.vcf.gz
+
+$APPTAINER_SNP gatk IndexFeatureFile -I {{PROJECTDIR}}/snp_calling/variants.vcf.gz

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# 
+# LSF Scheduler
+# 
+
+#BSUB -W {{HOURS}}:00
+#BSUB -n {{CPUS}}
+#BSUB -R "rusage[mem={{MEMORY}}GB]"
+#BSUB -u {{EMAIL}}
+#BSUB -o {{OUTPUT}}
+
+module load apptainer
+
+READ1SUFFIX={{READ1SUFFIX}}
+READ2SUFFIX={{READ2SUFFIX}}

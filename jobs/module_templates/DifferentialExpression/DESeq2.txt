@@ -1,0 +1,27 @@
+#
+# Differential Expression Analysis
+#
+
+APPTAINER_DESEQ="apptainer exec {{APPTAINER_DIR}}/DESeq2.sif"
+
+#Run the DESeq2 R script with the requisite kwargs
+$APPTAINER_DESEQ Rscript {{TEMPLATE_DIR}}/DifferentialExpression/DESeq2.R \
+    -i {{PROJECTDIR}}/star_out \
+    -s {{STRAND}} \
+    -m {{METATABLE}} \
+    -d {{DELIMITER}} \
+    -g {{GROUP1}} -h {{GROUP2}} \
+    -t {{TESTTYPE}} \
+    -c {{CUTOFF}} \
+    -p {{PALETTE1}} -q {{PALETTE2}} \
+    -o {{OUTPUT_DIR}}
+
+    #-i: Directory to where STAR gene counts are stored
+    #-m: Metadata file col 1, sample_prefix - col 2, group, header must be included 
+    #-s: use unstranded (2), forward stranded (3), or reverse stranded (4) counts
+    #-d: Delimiter of metadata file
+    #-g and -h: Names of your groups
+    #-t: Test type for DESeq2 analysis
+    #-c: FDR alpha cutoff for significance
+    #-p and -q: Hexcodes for group colors without hashtag
+    #-o: Directory for storing outputs of DESeq2 analysis

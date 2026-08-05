@@ -1,0 +1,97 @@
+#
+# Sequence Processing
+#
+
+APPTAINER_SEQPROCESSING="apptainer exec {{APPTAINER_DIR}}/SequenceProcessing.sif"
+
+#Send output to results
+mkdir {{FASTQ_OUTPUT_DIR}}/fastq_out
+FASTQOUT="{{FASTQ_OUTPUT_DIR}}/fastq_out"
+
+#Decompress the data
+for i in $(ls {{SEQUENCING_DATA}}/*.ora) 
+do
+    {{ORAD_EXECUTABLE}} --gz -P $FASTQOUT --ora-reference {{ORAD_REFERENCE}} $i
+done
+
+#create a mapping file to map the universal naming structure of this program with the original files
+count=1
+>{{FASTQ_OUTPUT_DIR}}/sample_name_map.tsv
+for file1 in ${FASTQOUT}/*${READ1SUFFIX}.fastq.gz; do
+    #Check if files matching the pattern actually exist
+    [ -e "$file1" ] || continue
+    
+    #Extract the base prefix by removing the Read 1 suffix
+    prefix="${file1%${READ1SUFFIX}.fastq.gz}"
+    
+    #Define the expected matching paired file
+    file2="${prefix}${READ2SUFFIX}.fastq.gz"
+    
+    #Only proceed if the matching paired file exists
+    if [ -f "$file2" ] || [ -e "$file2" ]; then
+        
+        # Format the count to be zero-padded and 4 digits
+        printf -v padded_count "%04d" "$count"
+
+        # Define the new sample name replacement
+        sample_name="${FASTQOUT}/sample${padded_count}"
+
+        # Generate the new filenames
+        new_file1="${sample_name}_1.fastq.gz"
+        new_file2="${sample_name}_2.fastq.gz"
+        
+        # Append the tab-delimited mapping to the output file
+        printf "%s\t%s\t%s\t%s\n" "$file1" "$file2" "$new_file1" "$new_file2" >> {{FASTQ_OUTPUT_DIR}}/sample_name_map.tsv
+        
+        # Rename the physical files
+        mv "$file1" "$new_file1"
+        mv "$file2" "$new_file2"
+        
+        # Increment the counter for the next pair
+        ((count++))
+    fi
+done
+
+#Create output directory for fastqc results
+mkdir ${FASTQOUT}_fastqc
+
+#Do the fastqc
+$APPTAINER_SEQPROCESSING fastqc -o ${FASTQOUT}_fastqc ${FASTQOUT}/*.gz
+
+#Run multiqc
+mkdir ${FASTQOUT}_multiqc_raw
+$APPTAINER_SEQPROCESSING multiqc ${FASTQOUT}_fastqc --outdir ${FASTQOUT}_multiqc_raw
+
+#Make directory for storing TrimGalore output
+mkdir ${FASTQOUT}_trimgal
+
+#create a fastq file list for trimming
+for f in ${FASTQOUT}/*_1.fastq.gz; do
+    printf '%s\n' "${f%.fastq.gz}"
+done > ${FASTQOUT}_fastq_list.txt
+
+#Run trim_galore variable and do a while loop for paired-end files
+#20 is used for --2colour because it is the default phred score for the -q, which is the standard quality cutoff
+while read i
+do
+  i="${i%_1}"
+  echo "start trimming $i"
+  $APPTAINER_SEQPROCESSING trim_galore --fastqc --2colour {{PHRED}} --cores {{CORES}} -o ${FASTQOUT}_trimgal --paired $i\_1.fastq.gz $i\_2.fastq.gz
+  echo "done trimming $i"
+done<${FASTQOUT}_fastq_list.txt
+
+#Make output directory (done)
+mkdir ${FASTQOUT}_multiqc_trimmed
+
+#Run multiqc
+$APPTAINER_SEQPROCESSING multiqc ${FASTQOUT}_trimgal --outdir ${FASTQOUT}_multiqc_trimmed
+
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "We recommend reviewing your multiqc output to determine if further hard-coded trimming is necessary."
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

@@ -1,0 +1,51 @@
+#
+# Read Alignment
+#
+
+APPTAINER_ALIGNER="apptainer exec {{APPTAINER_DIR}}/Aligners.sif"
+APPTAINER_SEQPROCESSING="apptainer exec {{APPTAINER_DIR}}/SequenceProcessing.sif"
+
+#Create directory to store genome index
+mkdir {{PROJECTDIR}}/star_index
+
+#Build index. For --sjdbOverhang, this should be your read length - 1 to build the junction database but the default value of 100 should be okay if anything
+#--genomeSAindexNbases default is 14
+$APPTAINER_ALIGNER STAR \
+    --runThreadN {{CORES}} \
+    --runMode genomeGenerate \
+    --genomeDir {{PROJECTDIR}}/star_index \
+    --genomeFastaFiles {{GEN_FASTA}} \
+    --sjdbGTFfile {{GTF}} \
+    --sjdbOverhang {{RLENGTH}} \
+    --genomeSAindexNbases {{SANINDEX}}
+
+#Create a manifest file for looping STAR Alignment
+for f in {{PROJECTDIR}}/fastq_out_trimgal/*_1_val_1.fq.gz; do
+    # 1. Remove everything up to the last slash (get the filename)
+    filename="${f##*/}"
+    # 2. Remove everything from _1 to the end of the string
+    sample_name="${filename%%_1*}"
+
+    printf "%s_1_val_1.fq.gz\t%s_2_val_2.fq.gz\t%s\n" "$sample_name" "$sample_name" "$sample_name"
+done > {{PROJECTDIR}}/STAR_manifest.txt
+
+#Map reads to index
+mkdir {{PROJECTDIR}}/star_out
+while IFS=$'\t' read -r -a col
+do
+ echo "${col[0]}"
+ echo "${col[1]}"
+ echo "${col[2]}"
+
+ $APPTAINER_ALIGNER STAR \
+	--runThreadN {{CORES}} \
+	--genomeDir {{PROJECTDIR}}/star_index \
+	--readFilesIn {{PROJECTDIR}}/fastq_out_trimgal/${col[0]} {{PROJECTDIR}}/fastq_out_trimgal/${col[1]} \
+	--readFilesCommand gunzip -c \
+	--outSAMtype BAM SortedByCoordinate \
+	--quantMode GeneCounts \
+	--outFileNamePrefix {{PROJECTDIR}}/star_out/${col[2]}
+done < {{PROJECTDIR}}/STAR_manifest.txt
+
+#multiqc of star mapping per sample
+$APPTAINER_SEQPROCESSING multiqc --filename {{PROJECTDIR}}/star_out/multiqc.html {{PROJECTDIR}}/star_out

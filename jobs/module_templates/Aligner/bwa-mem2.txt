@@ -1,0 +1,35 @@
+#
+# Read Alignment
+#
+
+APPTAINER_ALIGNER="apptainer exec {{APPTAINER_DIR}}/Aligners.sif"
+
+#to keep index and genome in same place with same name, move genome fasta over
+mkdir {{PROJECTDIR}}/bwa_index
+cp {{GEN_FASTA}} {{PROJECTDIR}}/bwa_index/{{BWA_PREFIX}}.fasta
+$APPTAINER_ALIGNER bwa-mem2 index -p {{PROJECTDIR}}/bwa_index/{{BWA_PREFIX}} {{PROJECTDIR}}/bwa_index/{{BWA_PREFIX}}.fasta
+
+#Create a manifest file for looping bwa_mem2 alignment
+for f in {{PROJECTDIR}}/fastq_out_trimgal/*_1_val_1.fq.gz; do
+    # 1. Remove everything up to the last slash (get the filename)
+    filename="${f##*/}"
+    # 2. Remove everything from _1 to the end of the string
+    sample_name="${filename%%_1*}"
+
+    printf "%s_1_val_1.fq.gz\t%s_2_val_2.fq.gz\t%s\n" "$sample_name" "$sample_name" "$sample_name"
+done > {{PROJECTDIR}}/bwa_manifest.txt
+
+#Align to reference, sort, mark duplicates, and index bam files
+mkdir {{PROJECTDIR}}/bwa_align
+while IFS=$'\t' read -ra col 
+do
+    echo "${col[0]}"
+    echo "${col[1]}"
+    echo "${col[2]}"
+
+    $APPTAINER_ALIGNER bwa-mem2 mem -t {{CORES}} {{PROJECTDIR}}/bwa_index/{{BWA_PREFIX}} {{PROJECTDIR}}/fastq_out_trimgal/${col[0]} {{PROJECTDIR}}/fastq_out_trimgal/${col[1]} > {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa
+
+    $APPTAINER_SEQPROCESSING samtools fixmate -@ {{CORES}} -m -O bam {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa - | $APPTAINER_SEQPROCESSING samtools sort -@ {{CORES}} - | $APPTAINER_SEQPROCESSING samtools markdup -@ {{CORES}} -s - {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam
+
+    $APPTAINER_SEQPROCESSING samtools index -b -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam --output {{PROJECTDIR}}/bwa_align/${col[2]}_indexed_analysis_ready.bai
+done < {{PROJECTDIR}}/bwa_manifest.txt

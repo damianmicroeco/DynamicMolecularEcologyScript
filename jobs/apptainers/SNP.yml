@@ -1,0 +1,14 @@
+name: SNP
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - gatk4=4.6.2.0
+  - openjdk=17
+  - bcftools=1.24
+  - samtools=1.24
+  - vcftools=0.1.17
+  - bamtools=2.5.3
+  - parallel
