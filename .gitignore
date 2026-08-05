@@ -1,0 +1,7 @@
+raw_data/
+SNP_test/
+processed_data/
+jobs/apptainers/*.sif
+jobs/old/
+jobs/__pycache__
+old/
