@@ -249,6 +249,18 @@ class WidgetItem(QFrame):
         self.update_visibility()
 
     # ---------------------------------------------------------
+    # Template helpers
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def comment(enabled, text):
+        """
+        Returns the text unchanged if enabled=True,
+        otherwise returns it commented out.
+        """
+        return text if enabled else f"# {text}"
+
+    # ---------------------------------------------------------
     # Template
     # ---------------------------------------------------------
 

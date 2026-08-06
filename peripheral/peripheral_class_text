@@ -1,0 +1,48 @@
+# ----------------------------------------------------------------------
+# SRA Download
+# ----------------------------------------------------------------------
+
+class SRA(WidgetItem):
+
+    TYPE = "sra"
+    TITLE = "SRA"
+
+    TEMPLATE = "SRA/sra.txt"
+
+    FIELDS = [
+
+        path(
+            "Project Directory",
+            template="PROJECTDIR",
+            mode="directory",
+        ),
+
+        path(
+            "SRR Accession List",
+            template="SRR",
+            mode="file",
+        ),
+
+        integer(
+            "Number of Cores",
+            template="CORES",
+            minimum=1,
+            maximum=512,
+            default=1,
+        ),
+
+    def get_template_context(self):
+
+        context = super().get_template_context()
+
+        context["APPTAINER_DIR"] = str(
+            Path(__file__).parent /
+            "apptainers"
+        )
+
+        context["TEMPLATE_DIR"] = str(
+            Path(__file__).parent /
+            "module_templates"
+        )
+
+        return context

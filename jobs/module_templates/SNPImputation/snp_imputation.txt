@@ -1,0 +1,13 @@
+#
+# SNP Imputation
+#
+
+APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
+
+#run default imputation strategy
+$APPTAINER_SNP beagle gt={{PROJECTDIR}}/snp_processing/snp_filtered_preimputation.vcf.gz \
+    out={{PROJECTDIR}}/snp_processing/snp_imputed.gt \
+    nthreads={{CORES}}
+
+#KWARGs that are commonly useful and you may want to consider are:
+#`ref`, `map`, `excludesamples`, `gp`, and `ne`

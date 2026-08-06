@@ -657,6 +657,50 @@ class SNPFilteringPreImputation(WidgetItem):
 
         return context
 
+# ----------------------------------------------------------------------
+# SNP Imputation
+# ----------------------------------------------------------------------
+
+class SNPImputation(WidgetItem):
+
+    TYPE = "snp_imputation"
+    TITLE = "SNP Imputation"
+
+    TEMPLATE = "SNPImputation/snp_imputation.txt"
+
+    FIELDS = [
+
+        path(
+            "Project Directory",
+            template="PROJECTDIR",
+            mode="directory",
+        ),
+
+        integer(
+            "Number of Cores",
+            template="CORES",
+            minimum=1,
+            maximum=512,
+            default=1,
+        ),
+    ]
+
+    def get_template_context(self):
+
+        context = super().get_template_context()
+
+        context["APPTAINER_DIR"] = str(
+            Path(__file__).parent /
+            "apptainers"
+        )
+
+        context["TEMPLATE_DIR"] = str(
+            Path(__file__).parent /
+            "module_templates"
+        )
+
+        return context
+
 """
 To create a new widget add the below as a new class above and then add it to the registry below  (in __all__):
 class NewAnalysis(WidgetItem):
@@ -702,5 +746,6 @@ __all__ = [
     "Coverage",
     "SNPCalling",
     "SNPFilteringPreImputation",
+    "SNPImputation",
 ]
 

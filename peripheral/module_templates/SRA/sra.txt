@@ -1,0 +1,23 @@
+#
+# SRA Download
+#
+
+APPTAINER_SRA="apptainer exec {{APPTAINER_DIR}}/SRA.sif"
+
+currentdir=$(pwd)
+mkdir {{PROJECTDIR}}/sra_download
+cd {{PROJECTDIR}}/sra_download
+
+#download SRA files
+$APPTAINER_SRA prefetch --option-file {{SRR}}
+
+#move sra files up one folder
+find . -mindepth 2 -maxdepth 2 -type f -exec mv -t . {} +
+
+#extract read data
+for file in ./*.sra; do
+    $APPTAINER_SRA fasterq-dump --split-files --skip-technical --threads {{CORES}} "$file"
+    $APPTAINER_SRA pigz -p {{CORES}} "${file%.sra}"_*.fastq
+done
+
+cd $currentdir

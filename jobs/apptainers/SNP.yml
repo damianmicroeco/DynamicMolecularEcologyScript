@@ -12,3 +12,4 @@ dependencies:
   - vcftools=0.1.17
   - bamtools=2.5.3
   - parallel
+  - beagle
