@@ -2,21 +2,21 @@
 # Calling SNPs
 #
 
-APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
+APPTAINER_SNP="apptainer exec --env OUTDIR='snp_calling' {{APPTAINER_DIR}}/SNP.sif"
 
 OUTDIR="snp_calling"
 THREADS=$(({{CORES}}/4))
 set -euo pipefail
 
 #convert sam files (suffixed with .bwa which was my method to distinguish from other aligners)
-mkdir {{PROJECTDIR}}/${OUTDIR}
+#mkdir {{PROJECTDIR}}/${APPTAINERENV_OUTDIR}
 find {{PROJECTDIR}}/bwa_align -name "*.bwa" | \
-$APPTAINER_SNP parallel -j $THREADS --env OUTDIR '
+$APPTAINER_SNP parallel -j $THREADS '
 sample=$(basename {} .bwa)
 
-$APPTAINER_SNP samtools view -@ 4 -bS {} | $APPTAINER_SNP samtools sort -@ 4 -o {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
+samtools view -@ 4 -bS {} | samtools sort -@ 4 -o {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
 
-$APPTAINER_SNP samtools index -@ 4 {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
+samtools index -@ 4 {{PROJECTDIR}}/${OUTDIR}/${sample}.bam
 '
 
 #create a BAM list
