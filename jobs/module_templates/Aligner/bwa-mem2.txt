@@ -29,7 +29,13 @@ do
 
     $APPTAINER_ALIGNER bwa-mem2 mem -t {{CORES}} {{PROJECTDIR}}/bwa_index/{{BWA_PREFIX}} {{PROJECTDIR}}/fastq_out_trimgal/${col[0]} {{PROJECTDIR}}/fastq_out_trimgal/${col[1]} > {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa
 
-    $APPTAINER_SEQPROCESSING samtools fixmate -@ {{CORES}} -m -O bam {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa - | $APPTAINER_SEQPROCESSING samtools sort -@ {{CORES}} - | $APPTAINER_SEQPROCESSING samtools markdup -@ {{CORES}} -s - {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam
+    #Potential optimization: The piping has broken in the past two weeks (20260730 to 20260807). For now, will run lines separately but will try and fix this in the future.
+    #fixmate is the one that definitely takes forever
+    $APPTAINER_ALIGNER samtools fixmate -@ {{CORES}} -m -O bam {{PROJECTDIR}}/bwa_align/${col[2]}_align.bwa {{PROJECTDIR}}/bwa_align/${col[2]}_fixmate.bam
+    
+    $APPTAINER_SEQPROCESSING samtools sort -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_fixmate.bam -o {{PROJECTDIR}}/bwa_align/${col[2]}_align_sort.bam
+    
+    $APPTAINER_SEQPROCESSING samtools markdup -@ {{CORES}} -s {{PROJECTDIR}}/bwa_align/${col[2]}_align_sort.bam {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam
 
-    $APPTAINER_SEQPROCESSING samtools index -b -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam --output {{PROJECTDIR}}/bwa_align/${col[2]}_indexed_analysis_ready.bai
+    $APPTAINER_ALIGNER samtools index -b -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam --output {{PROJECTDIR}}/bwa_align/${col[2]}_indexed_analysis_ready.bai
 done < {{PROJECTDIR}}/bwa_manifest.txt
