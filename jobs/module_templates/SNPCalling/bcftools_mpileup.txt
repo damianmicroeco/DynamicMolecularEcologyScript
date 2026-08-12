@@ -5,10 +5,10 @@
 APPTAINER_SNP='apptainer exec {{APPTAINER_DIR}}/SNP.sif'
 
 OUTDIR="snp_calling"
-mkdir={{PROJECTDIR}}/${OUTDIR}
+mkdir {{PROJECTDIR}}/${OUTDIR}
 
 #create a BAM list
-find "{{PROJECTDIR}}/${OUTDIR}" -name "*analysis_ready.bam" | sort > "{{PROJECTDIR}}/bam_list.txt"
+find "{{PROJECTDIR}}/bwa_align" -name "*analysis_ready.bam" | sort > "{{PROJECTDIR}}/bam_list.txt"
 
 #call variants jointly
 $APPTAINER_SNP bcftools mpileup \

@@ -9,6 +9,7 @@
 #SBATCH --mem-per-cpu={{MEMORY}}G
 #SBATCH --mail-user={{EMAIL}}
 #SBATCH --output={{OUTPUT}}
+#SBATCH --mail-type=ALL
 
 module load apptainer
 
