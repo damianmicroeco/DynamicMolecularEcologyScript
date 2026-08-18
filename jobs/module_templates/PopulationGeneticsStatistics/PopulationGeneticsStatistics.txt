@@ -1,0 +1,46 @@
+#
+# Calculating common statistics in Population Genetics
+#
+
+#Please note that SNP-calling is done separately for this widget than for GWAS and GEA because many population genetics statistics require the inclusion of unfiltered and/or invariant sites.
+
+APPTAINER_POPGEN="apptainer exec {{APPTAINER_DIR}}/PopGen.sif"
+OUTDIR="pop_gen"
+mkdir {{PROJECTDIR}}/${OUTDIR}
+
+#create a BAM list
+find "{{PROJECTDIR}}/bwa_align" -name "*analysis_ready.bam" | sort > "{{PROJECTDIR}}/bam_list_popgen.txt"
+
+#call variants jointly as gvcf and very quality control filtering to prepare for input into pixy
+$APPTAINER_POPGEN bcftools mpileup \
+    --threads {{CORES}} \
+    -Ou \
+    -a FORMAT/DP,FORMAT/AD \
+    -f "{{REFGENOME}}" \
+    -b "{{PROJECTDIR}}/bam_list_popgen.txt" | \
+$APPTAINER_POPGEN bcftools call \
+    --threads {{CORES}} \
+    -m \
+    -f GQ,GP \
+    --gvcf 1 \
+    -Ou | \
+$APPTAINER_POPGEN bcftools filter \
+    --exclude 'FMT/GQ < 30 | FMT/DP < 10' \
+    --set-GTs '.' \
+    -Ou | \
+$APPTAINER_POPGEN bcftools view \
+    -Ou | \
+$APPTAINER_POPGEN bgzip -c > "{{PROJECTDIR}}/${OUTDIR}/variants.gvcf.gz"
+
+#index vcf
+$APPTAINER_POPGEN tabix -p vcf "{{PROJECTDIR}}/${OUTDIR}/variants.gvcf.gz"
+
+#calculate statistics with pixy
+$APPTAINER_POPGEN pixy \
+    --stats pi dxy fst watterson theta tajima_d \
+    --vcf {{PROJECTDIR}}/${OUTDIR}/variants.gvcf.gz \
+    --populations {{POPULATION}} \
+    --window_size {{WINDOW_SIZE}} \
+    --n_cores {{CORES}} \
+    --gvcf \
+    --output_folder {{PROJECTDIR}}/${OUTDIR}

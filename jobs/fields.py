@@ -91,6 +91,7 @@ class Field(ABC):
         label,
         template=None,
         visible=True,
+        help_text=None,
     ):
         self.label = label
 
@@ -107,6 +108,7 @@ class Field(ABC):
         )
 
         self.visible = visible
+        self.help_text = help_text
 
         self.widget = None
         self.label_widget = None
@@ -180,11 +182,13 @@ class TextField(Field):
         template=None,
         default="",
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text,
         )
 
         self.default = default
@@ -220,11 +224,13 @@ class IntField(Field):
         maximum=100,
         default=0,
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text
         )
 
         self.minimum = minimum
@@ -271,11 +277,13 @@ class FloatField(Field):
         decimals=2,
         step=0.1,
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text
         )
 
         self.minimum = minimum
@@ -328,11 +336,13 @@ class ComboField(Field):
         template=None,
         default=None,
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text,
         )
 
         self.choices = list(choices)
@@ -374,11 +384,13 @@ class CheckField(Field):
         template=None,
         default=False,
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text,
         )
 
         self.default = default
@@ -413,11 +425,13 @@ class PathField(Field):
         mode="file",
         default="",
         visible=True,
+        help_text=None,
     ):
         super().__init__(
             label,
             template,
             visible,
+            help_text,
         )
 
         self.mode = mode
@@ -495,11 +509,13 @@ def text(
     label,
     template=None,
     default="",
+    help_text=None,
 ):
     return TextField(
         label=label,
         template=template,
         default=default,
+        help_text=help_text,
     )
 
 
@@ -509,6 +525,7 @@ def integer(
     minimum=0,
     maximum=100,
     default=0,
+    help_text=None,
 ):
     return IntField(
         label=label,
@@ -516,6 +533,7 @@ def integer(
         minimum=minimum,
         maximum=maximum,
         default=default,
+        help_text=help_text,
     )
 
 
@@ -527,6 +545,7 @@ def floating(
     default=0.0,
     decimals=2,
     step=0.1,
+    help_text=None,
 ):
     return FloatField(
         label=label,
@@ -536,6 +555,7 @@ def floating(
         default=default,
         decimals=decimals,
         step=step,
+        help_text=help_text,
     )
 
 
@@ -544,12 +564,14 @@ def combo(
     choices,
     template=None,
     default=None,
+    help_text=None,
 ):
     return ComboField(
         label=label,
         choices=choices,
         template=template,
         default=default,
+        help_text=help_text,
     )
 
 
@@ -557,11 +579,13 @@ def checkbox(
     label,
     template=None,
     default=False,
+    help_text=None,
 ):
     return CheckField(
         label=label,
         template=template,
         default=default,
+        help_text=help_text,
     )
 
 
@@ -570,12 +594,14 @@ def path(
     template=None,
     mode="file",
     default="",
+    help_text=None,
 ):
     return PathField(
         label=label,
         template=template,
         mode=mode,
         default=default,
+        help_text=help_text,
     )
 
 def visible_when(

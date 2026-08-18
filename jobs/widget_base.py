@@ -148,7 +148,22 @@ class WidgetItem(QFrame):
 
             field.widget = widget
             field.label_widget = label
+            
+            if field.help_text:
+                label.setToolTip(
+                field.help_text
+                )
 
+            widget.setToolTip(
+                field.help_text
+            )
+
+            # PathSelector is a composite widget. Apply the
+            # tooltip to its child widgets as well.
+            for child in widget.findChildren(QWidget):
+                child.setToolTip(
+                    field.help_text
+                )
             field.connect(self.change_callback)
 
             self.form_layout.addRow(

@@ -13,7 +13,12 @@ option_list <- list(
     make_option(c("-c", "--chrom_prefix"), type = "character", help = "Prefix of chromosome names"),
     make_option(c("-g", "--GTF"), type = "character", help = "Path to reference genome's GTF"),
     make_option(c("-o", "--outdir"), type = "character", help = "Path to output directory"),
-    make_option(c("-a", "--gprime_alpha"), type = "double", help = "Alpha cut-off for Gprime statistic")
+    make_option(c("-a", "--gprime_alpha"), type = "double", help = "Alpha cut-off for Gprime statistic"),
+    make_option(c("-f", "--refAlleleFreq"), type = "double", help = "Reference allele frequency for QTLSeqR SNP filtering"),
+    make_option(c("-d", "--minTotalDepth"), type = "integer", help = "Minimum total depth for QTLSeqR SNP filtering"),
+    make_option(c("-e", "--maxTotalDepth"), type = "integer", help = "Maximum total depth for QTLSeqR SNP filtering"),
+    make_option(c("-s", "--minSampleDepth"), type = "integer", help = "Minimum sample depth for QTLSeqR SNP filtering"),
+    make_option(c("-q", "--minGQ"), type = "integer", help = "Minimum GQ for QTLSeqR SNP filtering")
 )
 
 parser <- OptionParser(option_list = option_list, add_help_option = FALSE)
@@ -26,6 +31,11 @@ chrom_prefix = args$chrom_prefix
 GTF = args$GTF
 outdir = args$outdir
 gprime_alpha = args$gprime_alpha
+refAlleleFreq = args$refAlleleFreq
+minTotalDepth = args$minTotalDepth
+maxTotalDepth = args$maxTotalDepth
+minSampleDepth = args$minSampleDepth
+minGQ = args$minGQ
 
 #Choose which chromosomes will be included in the analysis (i.e. exclude smaller contigs)
 chroms = paste0(rep(chrom_prefix, N), 1:N)
@@ -69,11 +79,11 @@ dev.off()
 df_filt =
     filterSNPs(
         SNPset = df,
-        refAlleleFreq = 0.20,
-        minTotalDepth = 100,
-        maxTotalDepth = 400,
-        minSampleDepth = 40,
-        minGQ = 99
+        refAlleleFreq = refAlleleFreq,
+        minTotalDepth = minTotalDepth,
+        maxTotalDepth = maxTotalDepth,
+        minSampleDepth = minSampleDepth,
+        minGQ = minGQ
     )
 
 #SNP filtering is one of the most time-consuming steps. we recommend saving an image at this stage, commenting out the above, and loading the image before continuing if running this script multiple times.

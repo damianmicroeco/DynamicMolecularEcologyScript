@@ -145,18 +145,6 @@ class MainWindow(QMainWindow):
 
         tree.expandAll()
 
-        tree.setStyleSheet(
-            """
-            QTreeView {
-                font-size: 11pt;
-            }
-
-            QTreeView::item {
-                padding: 6px;
-            }
-            """
-        )
-
         self.selector.setView(
             tree
         )
@@ -219,14 +207,6 @@ class MainWindow(QMainWindow):
 
         self.script_preview.setReadOnly(
             True
-        )
-
-        self.script_preview.setStyleSheet(
-            """
-            font-family:Courier New;
-            background-color:#1F1E24;
-            color:#d4d4d4;
-            """
         )
 
         right_layout.addWidget(
@@ -679,13 +659,21 @@ class MainWindow(QMainWindow):
 # =============================================================
 # Application entry point
 # =============================================================
+stylesheet_path = (
+    Path(__file__).resolve().parent
+    / "styles"
+    / "app.qss"
+)
 
 if __name__ == "__main__":
+    
+    app = QApplication(sys.argv)
 
-    app = QApplication(
-        sys.argv
+    app.setStyleSheet(
+        stylesheet_path.read_text(
+            encoding="utf-8"
+        )
     )
-
 
     window = MainWindow()
 

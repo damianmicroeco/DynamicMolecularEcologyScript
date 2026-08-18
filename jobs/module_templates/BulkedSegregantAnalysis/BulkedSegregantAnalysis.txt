@@ -123,14 +123,21 @@ $APPTAINER_BSA gatk VariantsToTable \
    -R {{REFGENOME}} \
    -O {{PROJECTDIR}}/${OUTDIR}/variant_table.tsv
 
-#run QTLSeqR analysis (this will provide results for both deltaSNP and Gprime analyses
+#run QTLSeqR analysis (this will provide results for both deltaSNP and Gprime analyses)
+#-f, -d, -e, -s, and -q are best determined after assessing the 'depth_histogram', 'ref_allel_frequency', 'high_bulk_distribution', and 'low_distribution_plots' through the script below.
+#Thus, use the defaults provided for a first pass to determine more appropriate cutoffs (the defaults are often good enough for a first pass analysis) and replace the values here.
 $APPTAINER_BSA RScript {{TEMPLATE_DIR}}/BulkedSegregantAnalysis/BulkedSegregantAnalysis.R \
     -v {{PROJECTDIR}}/${OUTDIR}/variant_table.tsv \
     -n {{CHROM_COUNT}} \
     -c {{CHROM_PREFIX}} \
     -g {{GTF}} \
     -o {{PROJECTDIR}}/${OUTDIR} \
-    -a {{GPRIME_ALPHA}}
+    -a {{GPRIME_ALPHA}} \
+	-f {{ALLELE_FREQ}} \
+	-d {{MIN_TOTDEPTH}} \
+	-e {{MAX_TOTDEPTH}} \
+	-s {{MIN_SAMDEPTH}} \
+	-q {{GQ}}
 
     #-v: Path to output of GATK VariantsToTable Function
     #-n: Number of chromosomes
@@ -138,3 +145,8 @@ $APPTAINER_BSA RScript {{TEMPLATE_DIR}}/BulkedSegregantAnalysis/BulkedSegregantA
     #-g: Path to reference genome's GTF
     #-o: Path to output directory
     #-a: Alpha cut-off for Gprime statistic
+	#-f: Reference allele frequency for QTLSeqR SNP filtering
+	#-d: Minimum total depth for QTLSeqR SNP filtering
+	#-e: Maximum total depth for QTLSeqR SNP filtering
+	#-s: Minimum sample depth for QTLSeqR SNP filtering
+	#-q: Minimum GQ for QTLSeqR SNP filtering
