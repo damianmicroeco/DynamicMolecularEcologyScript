@@ -1,0 +1,24 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+   
+%files
+    PopulationStructure.yml
+   
+%environment
+   
+%post
+    ENV_NAME=$(head -1 PopulationStructure.yml | cut -d' ' -f2)
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> $APPTAINER_ENVIRONMENT
+    echo "conda activate $ENV_NAME" >> $APPTAINER_ENVIRONMENT
+   
+    . /opt/conda/etc/profile.d/conda.sh
+    conda env create -f PopulationStructure.yml -p /opt/conda/envs/$ENV_NAME
+    conda clean --all
+
+    # Activate the environment and install tess3r from GitHub
+    conda activate PopulationStructure
+    Rscript -e "devtools::install_github('bcm-uga/TESS3_encho_sen')"
+
+%runscript
+    exec "$@"
+

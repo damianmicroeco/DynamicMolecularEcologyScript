@@ -1,0 +1,28 @@
+#
+# Estimating Population Structure (LEA)
+#
+
+#This widget will estimate population structure using the sNMF framework in the LEA package
+#One could use STRUCTURE instead, but LEA is MUCH faster and approximates STRUCTURE relatively well
+#LEA, like many packages, is sensitive to missing values so it will be necessary to have run the SNP Filtering
+#and Imputation widgets to create the input vcf.
+
+APPTAINER_SNP='apptainer exec {{APPTAINER_DIR}}/SNP.sif'
+APPTAINER_PopStr='apptainer exec {{APPTAINER_DIR}}/SNP.sif'
+
+mkdir {{PROJECTDIR}}/LEA_out
+
+#LEA cannot use 
+$APPTAINER_SNP bcftools convert --gvcf2vcf {{PROJECTDIR}}/snp_processing/snp_imputed.gt -O v -o {{PROJECTDIR}}/LEA_out/LEA_input.vcf
+
+#Run LEA.R script which will produce many of the summary statistics. We recommend reviewing the outputs from the range of Ks here and rerunning your analysis based on that K +/- 1
+$APPTAINER_PopStr LEA.R \
+    -i {{PROJECTDIR}}/LEA_out/LEA_input.vcf \
+    -d {{PROJECTDIR}}/LEA_out \
+    -k {{MINK}} \
+    -j {{MAXK}}
+
+    #-i: input vcf
+    #-d: LEA working directory
+    #-k: minimum K populations to assess
+    #-j: minimum K populations to assess

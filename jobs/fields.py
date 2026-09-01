@@ -14,8 +14,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QHBoxLayout,
+    QVBoxLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QMessageBox,
 )
-from PySide6.QtCore import Signal
+
+from PySide6.QtCore import Signal, Qt
+
+import csv
 
 
 # ----------------------------------------------------------------------
@@ -68,6 +76,481 @@ class PathSelector(QWidget):
 
         self.pathChanged.emit(value)
 
+# ----------------------------------------------------------------------
+# Spreadsheet Editor
+# ----------------------------------------------------------------------
+
+class SpreadsheetEditor(QWidget):
+    """
+    Editable spreadsheet-like widget.
+
+    Supports:
+
+      • direct cell editing
+      • copy/paste from spreadsheets
+      • CSV import
+      • CSV export
+      • adding/removing rows
+      • adding/removing columns
+
+    The underlying data is represented as:
+
+        [
+            ["value", "value"],
+            ["value", "value"],
+        ]
+
+    All values are stored as strings so the result is JSON-compatible.
+    """
+
+    dataChanged = Signal()
+
+    def __init__(
+        self,
+        columns=None,
+        rows=3,
+        parent=None,
+    ):
+        super().__init__(parent)
+
+        self.columns = list(columns or ["Column 1", "Column 2"])
+
+        self._loading = False
+
+        layout = QVBoxLayout(self)
+
+        # ---------------------------------------------------------
+        # Table
+        # ---------------------------------------------------------
+
+        self.table = QTableWidget(
+            rows,
+            len(self.columns),
+            self,
+        )
+
+        self.table.setHorizontalHeaderLabels(
+            self.columns
+        )
+
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table.setSelectionMode(
+            QTableWidget.ContiguousSelection
+        )
+
+        self.table.setSelectionBehavior(
+            QTableWidget.SelectItems
+        )
+
+        self.table.setAlternatingRowColors(True)
+
+        self.table.cellChanged.connect(
+            self._on_cell_changed
+        )
+
+        layout.addWidget(self.table)
+
+        # ---------------------------------------------------------
+        # Buttons
+        # ---------------------------------------------------------
+
+        button_layout = QHBoxLayout()
+
+        self.add_row_button = QPushButton(
+            "Add Row"
+        )
+
+        self.remove_row_button = QPushButton(
+            "Remove Row"
+        )
+
+        self.add_column_button = QPushButton(
+            "Add Column"
+        )
+
+        self.remove_column_button = QPushButton(
+            "Remove Column"
+        )
+
+        self.import_button = QPushButton(
+            "Import CSV"
+        )
+
+        self.export_button = QPushButton(
+            "Export CSV"
+        )
+
+        button_layout.addWidget(
+            self.add_row_button
+        )
+
+        button_layout.addWidget(
+            self.remove_row_button
+        )
+
+        button_layout.addWidget(
+            self.add_column_button
+        )
+
+        button_layout.addWidget(
+            self.remove_column_button
+        )
+
+        button_layout.addStretch()
+
+        button_layout.addWidget(
+            self.import_button
+        )
+
+        button_layout.addWidget(
+            self.export_button
+        )
+
+        layout.addLayout(button_layout)
+
+        # ---------------------------------------------------------
+        # Connections
+        # ---------------------------------------------------------
+
+        self.add_row_button.clicked.connect(
+            self.add_row
+        )
+
+        self.remove_row_button.clicked.connect(
+            self.remove_row
+        )
+
+        self.add_column_button.clicked.connect(
+            self.add_column
+        )
+
+        self.remove_column_button.clicked.connect(
+            self.remove_column
+        )
+
+        self.import_button.clicked.connect(
+            self.import_csv
+        )
+
+        self.export_button.clicked.connect(
+            self.export_csv
+        )
+
+    # ---------------------------------------------------------
+    # Cell changes
+    # ---------------------------------------------------------
+
+    def _on_cell_changed(self, row, column):
+
+        if self._loading:
+            return
+
+        self.dataChanged.emit()
+
+    # ---------------------------------------------------------
+    # Rows
+    # ---------------------------------------------------------
+
+    def add_row(self):
+
+        row = self.table.rowCount()
+
+        self.table.insertRow(row)
+
+        self.dataChanged.emit()
+
+    def remove_row(self):
+
+        row = self.table.currentRow()
+
+        if row < 0:
+            return
+
+        self.table.removeRow(row)
+
+        self.dataChanged.emit()
+
+    # ---------------------------------------------------------
+    # Columns
+    # ---------------------------------------------------------
+
+    def add_column(self):
+
+        column = self.table.columnCount()
+
+        self.table.insertColumn(column)
+
+        self.table.setHorizontalHeaderItem(
+            column,
+            QTableWidgetItem(
+                f"Column {column + 1}"
+            ),
+        )
+
+        self.dataChanged.emit()
+
+    def remove_column(self):
+
+        column = self.table.currentColumn()
+
+        if column < 0:
+            return
+
+        if self.table.columnCount() <= 1:
+            return
+
+        self.table.removeColumn(column)
+
+        self.dataChanged.emit()
+
+    # ---------------------------------------------------------
+    # Data
+    # ---------------------------------------------------------
+
+    def value(self):
+        """
+        Return the table as a list of rows.
+        """
+
+        data = []
+
+        for row in range(
+            self.table.rowCount()
+        ):
+
+            values = []
+
+            for column in range(
+                self.table.columnCount()
+            ):
+
+                item = self.table.item(
+                    row,
+                    column,
+                )
+
+                if item is None:
+                    values.append("")
+                else:
+                    values.append(
+                        item.text()
+                    )
+
+            data.append(values)
+
+        return data
+
+    # ---------------------------------------------------------
+
+    def set_value(self, data):
+        """
+        Restore the table from a list of rows.
+
+        Expected format:
+
+            [
+                ["a", "b"],
+                ["c", "d"],
+            ]
+        """
+
+        if not isinstance(data, list):
+            return
+
+        self._loading = True
+
+        try:
+
+            if not data:
+                self.table.setRowCount(0)
+                return
+
+            # Determine maximum number of columns.
+            column_count = max(
+                len(row)
+                for row in data
+                if isinstance(row, list)
+            )
+
+            if column_count <= 0:
+                return
+
+            self.table.setColumnCount(
+                column_count
+            )
+
+            # Preserve existing column names where possible.
+            for column in range(column_count):
+
+                if column < len(self.columns):
+
+                    name = self.columns[column]
+
+                else:
+
+                    name = (
+                        f"Column {column + 1}"
+                    )
+
+                self.table.setHorizontalHeaderItem(
+                    column,
+                    QTableWidgetItem(name),
+                )
+
+            self.table.setRowCount(
+                len(data)
+            )
+
+            for row_index, row in enumerate(data):
+
+                if not isinstance(row, list):
+                    continue
+
+                for column_index, value in enumerate(row):
+
+                    if column_index >= column_count:
+                        break
+
+                    item = QTableWidgetItem(
+                        "" if value is None
+                        else str(value)
+                    )
+
+                    self.table.setItem(
+                        row_index,
+                        column_index,
+                        item,
+                    )
+
+        finally:
+
+            self._loading = False
+
+    # ---------------------------------------------------------
+    # CSV Import
+    # ---------------------------------------------------------
+
+    def import_csv(self):
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import CSV",
+            "",
+            "CSV Files (*.csv);;All Files (*)",
+        )
+
+        if not path:
+            return
+
+        try:
+
+            with open(
+                path,
+                "r",
+                newline="",
+                encoding="utf-8-sig",
+            ) as handle:
+
+                reader = csv.reader(handle)
+
+                rows = list(reader)
+
+            if not rows:
+                return
+
+            # -------------------------------------------------
+            # Treat the first row as headers only if it
+            # resembles the configured headers.
+            #
+            # Otherwise import every row as data.
+            # -------------------------------------------------
+
+            first_row = rows[0]
+
+            if (
+                self.columns
+                and first_row == self.columns
+            ):
+                data = rows[1:]
+
+            else:
+                data = rows
+
+            self.set_value(data)
+
+            self.dataChanged.emit()
+
+        except Exception as exc:
+
+            QMessageBox.critical(
+                self,
+                "CSV Import Error",
+                f"Could not import CSV file:\n\n{exc}",
+            )
+
+    # ---------------------------------------------------------
+    # CSV Export
+    # ---------------------------------------------------------
+
+    def export_csv(self):
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export CSV",
+            "",
+            "CSV Files (*.csv);;All Files (*)",
+        )
+
+        if not path:
+            return
+
+        try:
+
+            with open(
+                path,
+                "w",
+                newline="",
+                encoding="utf-8",
+            ) as handle:
+
+                writer = csv.writer(handle)
+
+                # Header row
+                headers = []
+
+                for column in range(
+                    self.table.columnCount()
+                ):
+
+                    item = (
+                        self.table.horizontalHeaderItem(
+                            column
+                        )
+                    )
+
+                    headers.append(
+                        item.text()
+                        if item is not None
+                        else f"Column {column + 1}"
+                    )
+
+                writer.writerow(headers)
+
+                # Data
+                for row in self.value():
+
+                    writer.writerow(row)
+
+        except Exception as exc:
+
+            QMessageBox.critical(
+                self,
+                "CSV Export Error",
+                f"Could not export CSV file:\n\n{exc}",
+            )
 
 # ----------------------------------------------------------------------
 # Base Field
@@ -456,6 +939,179 @@ class PathField(Field):
     def connect(self, callback):
         self.widget.pathChanged.connect(callback)
 
+# ----------------------------------------------------------------------
+# Spreadsheet Field
+# ----------------------------------------------------------------------
+
+class SpreadsheetField(Field):
+    """
+    Field containing an editable spreadsheet.
+
+    Parameters
+    ----------
+    columns : list[str]
+        Column headers.
+
+    rows : int
+        Initial number of empty rows.
+
+    default : list[list]
+        Optional initial table contents.
+
+    date_columns : list[int] | None
+        Optional zero-based column indexes containing dates.
+
+        This is currently metadata used by validation. Values remain
+        strings so that CSV imports and serialization remain simple.
+    """
+
+    def __init__(
+        self,
+        label,
+        columns=None,
+        template=None,
+        rows=3,
+        default=None,
+        date_columns=None,
+        visible=True,
+        help_text=None,
+    ):
+
+        super().__init__(
+            label,
+            template,
+            visible,
+            help_text,
+        )
+
+        self.columns = list(
+            columns or ["Column 1", "Column 2"]
+        )
+
+        self.rows = rows
+
+        self.default = (
+            default
+            if default is not None
+            else []
+        )
+
+        self.date_columns = list(
+            date_columns or []
+        )
+
+    # ---------------------------------------------------------
+
+    def create_widget(self):
+
+        self.widget = SpreadsheetEditor(
+            columns=self.columns,
+            rows=self.rows,
+        )
+
+        if self.default:
+            self.widget.set_value(
+                self.default
+            )
+
+        return self.widget
+
+    # ---------------------------------------------------------
+
+    def value(self):
+
+        return self.widget.value()
+
+    # ---------------------------------------------------------
+
+    def set_value(self, value):
+
+        self.widget.set_value(value)
+
+    # ---------------------------------------------------------
+
+    def connect(self, callback):
+
+        self.widget.dataChanged.connect(
+            callback
+        )
+
+    # ---------------------------------------------------------
+
+    def validate(self):
+
+        if not self.date_columns:
+            return True, ""
+
+        for row_index, row in enumerate(
+            self.value(),
+            start=1,
+        ):
+
+            # Completely empty rows are ignored.
+            if not any(
+                str(value).strip()
+                for value in row
+            ):
+                continue
+
+            for column_index in self.date_columns:
+
+                if column_index >= len(row):
+                    continue
+
+                value = str(
+                    row[column_index]
+                ).strip()
+
+                if not value:
+                    continue
+
+                if not self._is_valid_date(
+                    value
+                ):
+                    return (
+                        False,
+                        (
+                            f"Invalid date "
+                            f"'{value}' in row "
+                            f"{row_index}."
+                        ),
+                    )
+
+        return True, ""
+
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _is_valid_date(value):
+
+        from datetime import datetime
+
+        formats = [
+            "%Y-%m-%d",
+            "%Y/%m/%d",
+            "%m/%d/%Y",
+            "%m-%d-%Y",
+            "%d/%m/%Y",
+            "%d-%m-%Y",
+        ]
+
+        for date_format in formats:
+
+            try:
+
+                datetime.strptime(
+                    value,
+                    date_format,
+                )
+
+                return True
+
+            except ValueError:
+                pass
+
+        return False
 
 # ----------------------------------------------------------------------
 # Serialization Helpers
@@ -604,6 +1260,25 @@ def path(
         help_text=help_text,
     )
 
+def spreadsheet(
+    label,
+    columns=None,
+    template=None,
+    rows=3,
+    default=None,
+    date_columns=None,
+    help_text=None,
+):
+    return SpreadsheetField(
+        label=label,
+        columns=columns,
+        template=template,
+        rows=rows,
+        default=default,
+        date_columns=date_columns,
+        help_text=help_text,
+    )
+
 def visible_when(
     field,
     controller,
@@ -634,5 +1309,6 @@ __all__ = [
     "combo",
     "checkbox",
     "path",
+    "spreadsheet",
     "visible_when",
 ]

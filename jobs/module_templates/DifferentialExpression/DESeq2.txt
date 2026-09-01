@@ -8,18 +8,20 @@ APPTAINER_DESEQ="apptainer exec {{APPTAINER_DIR}}/DESeq2.sif"
 $APPTAINER_DESEQ Rscript {{TEMPLATE_DIR}}/DifferentialExpression/DESeq2.R \
     -i {{PROJECTDIR}}/star_out \
     -s {{STRAND}} \
-    -m {{METATABLE}} \
-    -d {{DELIMITER}} \
-    -g {{GROUP1}} -h {{GROUP2}} \
+    -m "{{METADATA_FILE}}" \
+    -r {{READ1SUFFIX}} \
+    -g {{GROUP1}}\
+    -h {{GROUP2}} \
     -t {{TESTTYPE}} \
     -c {{CUTOFF}} \
-    -p {{PALETTE1}} -q {{PALETTE2}} \
+    -p {{PALETTE1}}\
+    -q {{PALETTE2}} \
     -o {{OUTPUT_DIR}}
 
     #-i: Directory to where STAR gene counts are stored
-    #-m: Metadata file col 1, sample_prefix - col 2, group, header must be included 
+    #-m: Metadata file 
     #-s: use unstranded (2), forward stranded (3), or reverse stranded (4) counts
-    #-d: Delimiter of metadata file
+    #-r: suffix for read 1. We use this to help map sample names to the internal names of this package
     #-g and -h: Names of your groups
     #-t: Test type for DESeq2 analysis
     #-c: FDR alpha cutoff for significance

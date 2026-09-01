@@ -293,10 +293,12 @@ class WidgetItem(QFrame):
         self,
         template_root,
         filename,
+        context=None,
     ):
-        context = self.get_template_context()
 
-        # Resolve variables in filename first
+        if context is None:
+            context = self.get_template_context()
+
         resolved_filename = filename
 
         for key, value in context.items():
@@ -315,7 +317,6 @@ class WidgetItem(QFrame):
             encoding="utf-8"
         )
 
-        # Resolve variables inside template contents
         for key, value in context.items():
 
             text = text.replace(
@@ -326,23 +327,36 @@ class WidgetItem(QFrame):
         return text
 
     # ---------------------------------------------------------
+    # Preparation
+    # ---------------------------------------------------------
+
+    def prepare_files(self, output_directory):
+        """
+        Prepare files required by the generated script.
+
+        Subclasses can override this method.
+        """
+        return {}
+
+    # ---------------------------------------------------------
     # Script Generation
     # ---------------------------------------------------------
 
-    def build_script_fragment(self, template_root):
-        """
-        Default implementation.
+    def build_script_fragment(
+        self,
+        template_root,
+        context=None,
+    ):
 
-        If a subclass defines TEMPLATE, it is rendered automatically.
-        More complex widgets can override this method.
-        """
         if self.TEMPLATE is None:
             return ""
 
         return self.render_template(
             template_root,
             self.TEMPLATE,
+            context=context,
         )
+
 
     # ---------------------------------------------------------
     # Preview

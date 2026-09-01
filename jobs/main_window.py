@@ -429,12 +429,7 @@ class MainWindow(QMainWindow):
                     fragment
                 )
 
-
-        return "\n\n".join(
-            parts
-        )
-
-
+        return "\n\n".join(parts)
 
     def update_template_script(self):
 
@@ -482,6 +477,8 @@ class MainWindow(QMainWindow):
             file_path
         )
 
+        output_directory = script_path.parent
+
         json_path = (
             script_path
             .with_suffix(".json")
@@ -522,10 +519,37 @@ class MainWindow(QMainWindow):
 
         try:
 
+            parts = []
+
+            for widget in self.active_widgets:
+
+                if not widget.is_valid():
+                    continue
+
+                context = widget.get_template_context()
+
+                context.update(
+                    widget.prepare_files(
+                        output_directory
+                    )
+                )
+
+                fragment = widget.build_script_fragment(
+                    Path(__file__).parent /
+                    "module_templates",
+                    context=context,
+                )
+
+                if fragment.strip():
+                    parts.append(fragment)
+
+            script_text = "\n\n".join(parts)
+
             script_path.write_text(
-                self.build_script_text(),
+                script_text,
                 encoding="utf-8",
             )
+
 
 
             json_path.write_text(
@@ -653,33 +677,3 @@ class MainWindow(QMainWindow):
                 "Load Error",
                 str(error),
             )
-
-
-
-# =============================================================
-# Application entry point
-# =============================================================
-stylesheet_path = (
-    Path(__file__).resolve().parent
-    / "styles"
-    / "app.qss"
-)
-
-if __name__ == "__main__":
-    
-    app = QApplication(sys.argv)
-
-    app.setStyleSheet(
-        stylesheet_path.read_text(
-            encoding="utf-8"
-        )
-    )
-
-    window = MainWindow()
-
-    window.show()
-
-
-    sys.exit(
-        app.exec()
-    )

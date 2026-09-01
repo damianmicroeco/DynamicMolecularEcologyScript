@@ -10,12 +10,14 @@ from fields import (
     floating,
     combo,
     path,
+    spreadsheet,
     visible_when,
     checkbox,
 )
 
 from widget_base import WidgetItem
 
+import csv
 
 # ----------------------------------------------------------------------
 # Scheduler
@@ -509,12 +511,34 @@ class DifferentialExpression(WidgetItem):
             ),
         ),
 
-        path(
+        spreadsheet(
             "Metadata",
-            template="METATABLE",
-            mode="file",
+            template="METADATA",
+            columns=[
+                "sample_name",
+                "group_id",
+            ],
+            rows=3,
             help_text=(
-                    "TBD"
+                "Paste spreadsheet data of your sample metadata here or "
+                "import a CSV file. The first column should be your sample names "
+                "without special characters and the second column the group name "
+                "without special characters. By sample names, we explicitly mean "
+                "your read file names without the read 1 suffix. For example: "
+                "`14-008_S11_L001_R1_001.fastq.ora` read 1 suffix is `14-008_S11_L001`."
+            ),
+        ),
+
+        text(
+            "Read 1 Suffix",
+            template="READ1SUFFIX",
+            help_text=(
+                    "(text)\n"
+                    "The suffix in file names that distinguish between Read 1 "
+                    "and Read 2 in paired-end reads. For instance, in the "
+                    "files `14-008_S11_L001_R1_001.fastq.ora` and "
+                    "`14-008_S11_L001_R2_001.fastq.ora`, the read 1 and read 2 "
+                    "suffixes are `R1_001` and `R2_001`, respectively."
             ),
         ),
 
@@ -531,20 +555,6 @@ class DifferentialExpression(WidgetItem):
                     "(drop-down)\n"
                     "This is based on the type of library preparation that "
                     "was used to generate the transcriptome libraries."
-            ),
-        ),
-
-        combo(
-            "Delimiter",
-            [
-                "Comma-delimited",
-                "Tab-delimited",
-            ],
-            template="DELIMITER",
-            default="Comma-delimited",
-            help_text=(
-                    "(drop-down)\n"
-                    "The delimiter used in the metadata file."
             ),
         ),
 
@@ -627,6 +637,46 @@ class DifferentialExpression(WidgetItem):
             ),
         ),
     ]
+
+    def prepare_files(self, output_directory):
+
+        output_directory = Path(
+            output_directory
+        )
+
+        output_directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        metadata_field = self.field(
+            "Metadata"
+        )
+
+        metadata_file = (
+            output_directory / "metadata.csv"
+        )
+
+        with metadata_file.open(
+            "w",
+            newline="",
+            encoding="utf-8",
+        ) as handle:
+
+            writer = csv.writer(handle)
+
+            writer.writerow(
+                metadata_field.columns
+            )
+
+            writer.writerows(
+                metadata_field.value()
+            )
+
+        return {
+            "METADATA_FILE": str(metadata_file)
+        }
+
 
     def get_template_context(self):
 
@@ -1048,7 +1098,7 @@ class SNPImputation(WidgetItem):
 
 class BulkedSegregantAnalysis(WidgetItem):
 
-    TYPE = "deseq"
+    TYPE = "bsa"
     TITLE = "Bulked Segregant Analysis"
 
     HELP_TEXT = """
@@ -1227,7 +1277,7 @@ class BulkedSegregantAnalysis(WidgetItem):
         ),
 
         integer(
-            "Minimum Total Depth",
+            "Minimum Sample Depth",
             template="MIN_SAMDEPTH",
             minimum=0,
             maximum=100000,

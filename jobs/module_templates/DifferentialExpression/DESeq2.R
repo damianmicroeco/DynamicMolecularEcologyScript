@@ -10,8 +10,8 @@ library(dplyr)
 option_list <- list(
     make_option(c("-i", "--genecountdir"), type = "character", help = "Directory where gene counts are stored"),
     make_option(c("-m", "--metatable"), type = "character", help = "Metadata file (col 1: sample_prefix, col 2: group, header must be included)"),
+    make_option(c("-r", "--read1suffix"), type = "character", help = "Read 1 Suffix for matching to internal naming conventions"),
     make_option(c("-s", "--strand"), type = "character", help = "Use unstranded (2), forward stranded (3), or reverse stranded (4) counts"),
-    make_option(c("-d", "--delimiter"), type = "character", help = "Delimiter for metadata (',' or '\t')"),
     make_option(c("-g", "--group1"), type = "character", help = "Name of group 1"),
     make_option(c("-h", "--group2"), type = "character", help = "Name of group 2"),
     make_option(c("-t", "--test_type"), type = "character", help = "Test for DESeq2 ('Wald' or 'LRT')"),
@@ -27,10 +27,10 @@ args <- parse_args(parser)
 
 ## Initiating Variables
 genecountdir = args$genecountdir #directory containing the read counts from STAR
+read1suffix = args$read1suffix #suffix for read 1 reads 
 strandcolumn = args$strand #whether to use unstranded (2), forward stranded (3), or reverse stranded (4) counts
 grouplist1 = c(args$group1, args$group2) #levels of factor of interest in alphabetical order of files (i.e., the same order as list.files output)
 meta_table = args$metatable #metadata with column 1 being the read prefix and column 2 as your grouping variable
-meta_table_delimiter = ifelse(args$delimiter == "Comma-delimited", ",", "\t") #delimiter of your table, either "," or "\t"
 test_type = args$test_type #type of test for DESeq analysis. Wald is preferred if you're just doing your model against a full null. LRT is useful if you're comparing between a full model and a simplified model
 alpha_cutoff = args$cutoff #alpha cut-off for multiple hypothesis correction of DESeq2 results
 color_palette1 = c(paste("#", args$palette1, sep = ""), paste("#", args$palette2, sep = "")) #color palette for plotting
@@ -48,15 +48,25 @@ if (strandcolumn == "Unstranded") {
 cat("Script is loaded and arguments saved.\n")
 
 #create output directory
-if (dir.exists(output)) {
-    unlink(output, recursive = TRUE)
-  }
-dir.create(output, recursive = TRUE)
+dir.create(output, recursive = TRUE, showWarnings = FALSE)
 
 
 ## Dataframe Management
 ### Build gene counts dataframe ###
 filelist = list.files(genecountdir, pattern = "*ReadsPerGene.out.tab")
+
+#read in sample mapping dataframe
+samplemap = read.table(paste(sub("(.*\\/).*", "\\1", genecountdir), "/sample_name_map.tsv", sep = ""),
+                        sep = "\t",
+                        header = FALSE)
+samplemap$V1 = lapply(samplemap$V1, function(x) basename(x))
+samplemap$V2 = NULL
+samplemap$V3 = lapply(samplemap$V3, function(x) basename(x))
+
+samplemap$V1 = lapply(samplemap$V1, function(x) sub(paste(read1suffix, ".fastq.gz", sep = ""), "", x, fixed = TRUE))
+samplemap$V3 = lapply(samplemap$V3, function(x) sub(".fastq.gz", "", x, fixed = TRUE))
+
+colnames(samplemap) = c("sample_name", "new_sample_name")
 
 #initialize counts dataframe by reading in first file
 counts = read.table(paste(genecountdir, "/", filelist[1], sep = ""))
@@ -72,12 +82,20 @@ for (i in 2:length(filelist)) {
     colnames(counts)[i] = filelist[i]
 }
 
+colnames(counts) = lapply(colnames(counts) function(x) basename(x))
+colnames(counts) = lapply(colnames(counts) function(x) sub("ReadsPerGene.out.tab", "", x))
 cat("Read counts have been read.\n")
 
 ### Build metadata dataframe ###
-meta_df = read.table(meta_table, header = TRUE, sep = meta_table_delimiter)
+meta_df = read.csv(meta_table, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
 
 colnames(meta_df) = c("sample_name", "group_id")
+
+meta_df = merge(meta_df, samplemap, by = "sample_name")
+meta_df$sample_name = NULL
+meta_df = meta_df[,c("new_sample_name", "group_id")]
+colnames(meta_df)[1] = "sample_name"
+
 row.names(meta_df) = meta_df$sample_name
 
 ### Prepare dataframes for input into DESeq2 ###
@@ -131,7 +149,16 @@ print("Significant genes:")
 print(rownames(sig_genes))
 
 #which group is gene enriched in?
-res$enrichment = ifelse(res$log2FoldChange < 0, group1_order[1], group1_order[2])
+res$enrichment = res$enrichment <- ifelse(
+    res$log2FoldChange < 0,
+    group1_order[1],
+    ifelse(
+        res$log2FoldChange > 0,
+        group1_order[2],
+        "No difference"
+    )
+)
+
 sig_genes$enrichment = ifelse(sig_genes$log2FoldChange < 0, group1_order[1], group1_order[2])
 
 #export results
