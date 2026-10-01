@@ -194,60 +194,6 @@ class SpreadsheetEditor(QWidget):
         # Buttons
         # ---------------------------------------------------------
 
-<<<<<<< HEAD
-        button_layout = QHBoxLayout()
-
-        self.add_row_button = QPushButton(
-            "Add Row"
-        )
-
-        self.remove_row_button = QPushButton(
-            "Remove Row"
-        )
-
-        self.add_column_button = QPushButton(
-            "Add Column"
-        )
-
-        self.remove_column_button = QPushButton(
-            "Remove Column"
-        )
-
-        self.import_button = QPushButton(
-            "Import CSV"
-        )
-
-        self.export_button = QPushButton(
-            "Export CSV"
-        )
-
-        button_layout.addWidget(
-            self.add_row_button
-        )
-
-        button_layout.addWidget(
-            self.remove_row_button
-        )
-
-        button_layout.addWidget(
-            self.add_column_button
-        )
-
-        button_layout.addWidget(
-            self.remove_column_button
-        )
-
-        button_layout.addStretch()
-
-        button_layout.addWidget(
-            self.import_button
-        )
-
-        button_layout.addWidget(
-            self.export_button
-        )
-
-=======
         button_layout = QGridLayout()
 
         self.add_row_button = QPushButton("Add Row")
@@ -285,7 +231,6 @@ class SpreadsheetEditor(QWidget):
         button_layout.setColumnStretch(1, 1)
         button_layout.setColumnStretch(2, 1)
 
->>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
         layout.addLayout(button_layout)
 
         # ---------------------------------------------------------
