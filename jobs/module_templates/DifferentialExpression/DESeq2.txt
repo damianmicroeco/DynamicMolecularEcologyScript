@@ -10,11 +10,19 @@ $APPTAINER_DESEQ Rscript {{TEMPLATE_DIR}}/DifferentialExpression/DESeq2.R \
     -s {{STRAND}} \
     -m "{{METADATA_FILE}}" \
     -r {{READ1SUFFIX}} \
+<<<<<<< HEAD
     -g {{GROUP1}}\
     -h {{GROUP2}} \
     -t {{TESTTYPE}} \
     -c {{CUTOFF}} \
     -p {{PALETTE1}}\
+=======
+    -g {{GROUP1}} \
+    -h {{GROUP2}} \
+    -t {{TESTTYPE}} \
+    -c {{CUTOFF}} \
+    -p {{PALETTE1}} \
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
     -q {{PALETTE2}} \
     -o {{OUTPUT_DIR}}
 

@@ -56,6 +56,7 @@ dir.create(output, recursive = TRUE, showWarnings = FALSE)
 filelist = list.files(genecountdir, pattern = "*ReadsPerGene.out.tab")
 
 #read in sample mapping dataframe
+<<<<<<< HEAD
 samplemap = read.table(paste(sub("(.*\\/).*", "\\1", genecountdir), "/sample_name_map.tsv", sep = ""),
                         sep = "\t",
                         header = FALSE)
@@ -65,6 +66,18 @@ samplemap$V3 = lapply(samplemap$V3, function(x) basename(x))
 
 samplemap$V1 = lapply(samplemap$V1, function(x) sub(paste(read1suffix, ".fastq.gz", sep = ""), "", x, fixed = TRUE))
 samplemap$V3 = lapply(samplemap$V3, function(x) sub(".fastq.gz", "", x, fixed = TRUE))
+=======
+samplemap = read.table(file.path(dirname(genecountdir), "/sample_name_map.tsv"),
+                        sep = "\t",
+                        header = FALSE)
+samplemap$V1 = unlist(lapply(samplemap$V1, function(x) basename(x)))
+samplemap$V2 = NULL
+samplemap$V3 = unlist(lapply(samplemap$V3, function(x) basename(x)))
+samplemap$V4 = NULL
+
+samplemap$V1 = unlist(lapply(samplemap$V1, function(x) sub(paste(read1suffix, ".fastq.gz", sep = ""), "", x, fixed = TRUE)))
+samplemap$V3 = unlist(lapply(samplemap$V3, function(x) sub("_1.fastq.gz", "", x, fixed = TRUE)))
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
 colnames(samplemap) = c("sample_name", "new_sample_name")
 
@@ -82,8 +95,13 @@ for (i in 2:length(filelist)) {
     colnames(counts)[i] = filelist[i]
 }
 
+<<<<<<< HEAD
 colnames(counts) = lapply(colnames(counts) function(x) basename(x))
 colnames(counts) = lapply(colnames(counts) function(x) sub("ReadsPerGene.out.tab", "", x))
+=======
+colnames(counts) = lapply(colnames(counts), function(x) basename(x))
+colnames(counts) = lapply(colnames(counts), function(x) sub("ReadsPerGene.out.tab", "", x))
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 cat("Read counts have been read.\n")
 
 ### Build metadata dataframe ###

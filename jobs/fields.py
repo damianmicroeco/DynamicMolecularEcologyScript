@@ -15,6 +15,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QVBoxLayout,
+<<<<<<< HEAD
+=======
+    QGridLayout,
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -76,6 +80,7 @@ class PathSelector(QWidget):
 
         self.pathChanged.emit(value)
 
+<<<<<<< HEAD
 # ----------------------------------------------------------------------
 # Spreadsheet Editor
 # ----------------------------------------------------------------------
@@ -94,26 +99,53 @@ class SpreadsheetEditor(QWidget):
       • adding/removing columns
 
     The underlying data is represented as:
+=======
+class SpreadsheetEditor(QWidget):
+    """
+    Generic editable spreadsheet-like widget.
+
+    The spreadsheet itself knows nothing about the meaning of
+    individual columns. The parent widget supplies the column names.
+
+    Data is represented as:
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
         [
             ["value", "value"],
             ["value", "value"],
         ]
 
+<<<<<<< HEAD
     All values are stored as strings so the result is JSON-compatible.
+=======
+    All values are stored as strings.
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
     """
 
     dataChanged = Signal()
 
     def __init__(
         self,
+<<<<<<< HEAD
         columns=None,
+=======
+        columns,
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
         rows=3,
         parent=None,
     ):
         super().__init__(parent)
 
+<<<<<<< HEAD
         self.columns = list(columns or ["Column 1", "Column 2"])
+=======
+        if not columns:
+            raise ValueError(
+                "SpreadsheetEditor requires at least one column."
+            )
+
+        self.columns = list(columns)
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
         self._loading = False
 
@@ -129,6 +161,11 @@ class SpreadsheetEditor(QWidget):
             self,
         )
 
+<<<<<<< HEAD
+=======
+        self.table.setMinimumHeight(260)
+
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
         self.table.setHorizontalHeaderLabels(
             self.columns
         )
@@ -157,6 +194,7 @@ class SpreadsheetEditor(QWidget):
         # Buttons
         # ---------------------------------------------------------
 
+<<<<<<< HEAD
         button_layout = QHBoxLayout()
 
         self.add_row_button = QPushButton(
@@ -209,6 +247,45 @@ class SpreadsheetEditor(QWidget):
             self.export_button
         )
 
+=======
+        button_layout = QGridLayout()
+
+        self.add_row_button = QPushButton("Add Row")
+        self.remove_row_button = QPushButton("Remove Row")
+        self.add_column_button = QPushButton("Add Column")
+        self.remove_column_button = QPushButton("Remove Column")
+        self.import_button = QPushButton("Import CSV")
+        self.export_button = QPushButton("Export CSV")
+
+        button_layout.addWidget(
+            self.add_row_button, 0, 0
+        )
+
+        button_layout.addWidget(
+            self.remove_row_button, 0, 1
+        )
+
+        button_layout.addWidget(
+            self.add_column_button, 0, 2
+        )
+
+        button_layout.addWidget(
+            self.remove_column_button, 1, 0
+        )
+
+        button_layout.addWidget(
+            self.import_button, 1, 1
+        )
+
+        button_layout.addWidget(
+            self.export_button, 1, 2
+        )
+
+        button_layout.setColumnStretch(0, 1)
+        button_layout.setColumnStretch(1, 1)
+        button_layout.setColumnStretch(2, 1)
+
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
         layout.addLayout(button_layout)
 
         # ---------------------------------------------------------
@@ -283,11 +360,19 @@ class SpreadsheetEditor(QWidget):
 
         self.table.insertColumn(column)
 
+<<<<<<< HEAD
         self.table.setHorizontalHeaderItem(
             column,
             QTableWidgetItem(
                 f"Column {column + 1}"
             ),
+=======
+        name = f"Column {column + 1}"
+
+        self.table.setHorizontalHeaderItem(
+            column,
+            QTableWidgetItem(name),
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
         )
 
         self.dataChanged.emit()
@@ -311,9 +396,12 @@ class SpreadsheetEditor(QWidget):
     # ---------------------------------------------------------
 
     def value(self):
+<<<<<<< HEAD
         """
         Return the table as a list of rows.
         """
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
         data = []
 
@@ -332,12 +420,19 @@ class SpreadsheetEditor(QWidget):
                     column,
                 )
 
+<<<<<<< HEAD
                 if item is None:
                     values.append("")
                 else:
                     values.append(
                         item.text()
                     )
+=======
+                values.append(
+                    "" if item is None
+                    else item.text()
+                )
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
             data.append(values)
 
@@ -346,6 +441,7 @@ class SpreadsheetEditor(QWidget):
     # ---------------------------------------------------------
 
     def set_value(self, data):
+<<<<<<< HEAD
         """
         Restore the table from a list of rows.
 
@@ -356,6 +452,8 @@ class SpreadsheetEditor(QWidget):
                 ["c", "d"],
             ]
         """
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
         if not isinstance(data, list):
             return
@@ -368,7 +466,10 @@ class SpreadsheetEditor(QWidget):
                 self.table.setRowCount(0)
                 return
 
+<<<<<<< HEAD
             # Determine maximum number of columns.
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
             column_count = max(
                 len(row)
                 for row in data
@@ -382,6 +483,7 @@ class SpreadsheetEditor(QWidget):
                 column_count
             )
 
+<<<<<<< HEAD
             # Preserve existing column names where possible.
             for column in range(column_count):
 
@@ -394,6 +496,14 @@ class SpreadsheetEditor(QWidget):
                     name = (
                         f"Column {column + 1}"
                     )
+=======
+            for column in range(column_count):
+
+                if column < len(self.columns):
+                    name = self.columns[column]
+                else:
+                    name = f"Column {column + 1}"
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 
                 self.table.setHorizontalHeaderItem(
                     column,
@@ -455,12 +565,16 @@ class SpreadsheetEditor(QWidget):
             ) as handle:
 
                 reader = csv.reader(handle)
+<<<<<<< HEAD
 
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
                 rows = list(reader)
 
             if not rows:
                 return
 
+<<<<<<< HEAD
             # -------------------------------------------------
             # Treat the first row as headers only if it
             # resembles the configured headers.
@@ -468,6 +582,8 @@ class SpreadsheetEditor(QWidget):
             # Otherwise import every row as data.
             # -------------------------------------------------
 
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
             first_row = rows[0]
 
             if (
@@ -475,7 +591,10 @@ class SpreadsheetEditor(QWidget):
                 and first_row == self.columns
             ):
                 data = rows[1:]
+<<<<<<< HEAD
 
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
             else:
                 data = rows
 
@@ -518,7 +637,10 @@ class SpreadsheetEditor(QWidget):
 
                 writer = csv.writer(handle)
 
+<<<<<<< HEAD
                 # Header row
+=======
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
                 headers = []
 
                 for column in range(
@@ -539,9 +661,13 @@ class SpreadsheetEditor(QWidget):
 
                 writer.writerow(headers)
 
+<<<<<<< HEAD
                 # Data
                 for row in self.value():
 
+=======
+                for row in self.value():
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
                     writer.writerow(row)
 
         except Exception as exc:

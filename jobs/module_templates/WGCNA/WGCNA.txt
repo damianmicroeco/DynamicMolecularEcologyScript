@@ -1,0 +1,12 @@
+#
+# WGCNA: Whole Genome Co-expression Network Analysis
+#
+
+# There are many cutoffs that need to be decided on interactively by looking at the data.
+# This widget will not run the analysis, but instead create a R Markdown file with explanations
+# that can be run separately using the WGCNA apptainer in the apptainer folder.
+# The R Markdown file will be called `WGCNA.Rmd` and its assumed working directory is the project
+# folder. If users do not have enough resources for interactive use through RStudio on their local
+# computers or interactive sessions with an HPC. They can instead submit a job to their cluster with
+# `Rscript -e "rmarkdown::render('WGCNA.Rmd')"` from the project directory in chunks or testing
+# different parameters.

@@ -8,11 +8,19 @@
 #and Imputation widgets to create the input vcf.
 
 APPTAINER_SNP='apptainer exec {{APPTAINER_DIR}}/SNP.sif'
+<<<<<<< HEAD
 APPTAINER_PopStr='apptainer exec {{APPTAINER_DIR}}/SNP.sif'
 
 mkdir {{PROJECTDIR}}/LEA_out
 
 #LEA cannot use 
+=======
+APPTAINER_PopStr='apptainer exec {{APPTAINER_DIR}}/PopStr.sif'
+
+mkdir {{PROJECTDIR}}/LEA_out
+
+#LEA cannot use gVCF so we need to convert to vcf
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 $APPTAINER_SNP bcftools convert --gvcf2vcf {{PROJECTDIR}}/snp_processing/snp_imputed.gt -O v -o {{PROJECTDIR}}/LEA_out/LEA_input.vcf
 
 #Run LEA.R script which will produce many of the summary statistics. We recommend reviewing the outputs from the range of Ks here and rerunning your analysis based on that K +/- 1

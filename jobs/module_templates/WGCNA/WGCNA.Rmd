@@ -1,0 +1,108 @@
+---
+title: "WGCNA: Whole Genome Co-expression Network Analysis"
+output: html_document
+date: "2026-09-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preface
+
+The goal of this script is to conduct a WGCNA. The assumed working directory is the project directory. There are arbitrary decisions that must be made when running this analysis so the widget that created this script is initializing the environment you will need to run the chunks below. We have included information that may be useful for determining the cut-offs, but please be aware that there is some discretion about what is a "good" cut-off. We provide here our suggestions, but please consider your decisions thoroughly.
+
+```{r}
+library(DESeq2)
+library(WGCNA)
+library(flashClust)
+```
+
+## Initialize Environment
+```{r}
+raw_reads = ""
+```
+
+## Normalize Reads
+WGCNA requires normalized reads. Here, we use DESeq2's vst function. Other options like TPM may also be suitable. 
+
+```{r}
+### Build gene counts dataframe ###
+filelist = list.files(genecountdir, pattern = "*ReadsPerGene.out.tab")
+
+#read in sample mapping dataframe
+samplemap = read.table(file.path(dirname(genecountdir), "/sample_name_map.tsv"),
+                        sep = "\t",
+                        header = FALSE)
+samplemap$V1 = unlist(lapply(samplemap$V1, function(x) basename(x)))
+samplemap$V2 = NULL
+samplemap$V3 = unlist(lapply(samplemap$V3, function(x) basename(x)))
+samplemap$V4 = NULL
+
+samplemap$V1 = unlist(lapply(samplemap$V1, function(x) sub(paste(read1suffix, ".fastq.gz", sep = ""), "", x, fixed = TRUE)))
+samplemap$V3 = unlist(lapply(samplemap$V3, function(x) sub("_1.fastq.gz", "", x, fixed = TRUE)))
+
+colnames(samplemap) = c("sample_name", "new_sample_name")
+
+#initialize counts dataframe by reading in first file
+counts = read.table(paste(genecountdir, "/", filelist[1], sep = ""))
+row.names(counts) = counts$V1
+counts = counts[,c(1, strandcolumn)]
+colnames(counts)[2] = filelist[1]
+counts[,3:(length(filelist)+1)] = NA
+counts$V1 = NULL
+
+for (i in 2:length(filelist)) {
+    tempdf = read.table(paste(genecountdir, "/", filelist[i], sep = ""))
+    counts[,i] = tempdf[,strandcolumn]
+    colnames(counts)[i] = filelist[i]
+}
+
+colnames(counts) = lapply(colnames(counts), function(x) basename(x))
+colnames(counts) = lapply(colnames(counts), function(x) sub("ReadsPerGene.out.tab", "", x))
+cat("Read counts have been read.\n")
+
+### Build metadata dataframe ###
+meta_df = read.csv(meta_table, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+
+colnames(meta_df) = c("sample_name", "group_id")
+
+meta_df = merge(meta_df, samplemap, by = "sample_name")
+meta_df$sample_name = NULL
+meta_df = meta_df[,c("new_sample_name", "group_id")]
+colnames(meta_df)[1] = "sample_name"
+
+row.names(meta_df) = meta_df$sample_name
+
+### Prepare dataframes for input into DESeq2 ###
+#put metadata in order of column names from gene counts matrix
+all(rownames(meta_df) %in% colnames(counts)) #check all samples are in counts
+all(rownames(meta_df) == colnames(counts)) #check samples are in order
+counts = counts[, rownames(meta_df)] #put data in same order if the first is true but the second is false
+
+#remove STAR info about unmapped, multimapped etc. reads
+counts = counts[5:dim(counts)[1],]
+
+#order factor levels for DESeq to know which is the reference group
+group1_order = c(args$group1, args$group2)
+meta_df$group_id = factor(meta_df$group_id, levels = group1_order)
+
+cat("Metadata has been read.\n")
+
+#load data in to DESeq object
+dds = DESeqDataSetFromMatrix(countData = counts,
+                                    colData = meta_df,
+                                    design = ~group_id
+                                    )
+
+#remove low count reads (optional, but I'm doing it)
+keep = rowSums(counts(dds)) >= 10
+dds = dds[keep,]
+
+### Transform data for variance stabilization ###
+vsd = vst(dds, blind = FALSE) #if setting `blind = TRUE`, within-group variability is calculated across ALL samples rather than within groups
+
+#transpose for wgcna (rows = samples, genes = columns)
+wgcna_input = t(assay(vsd))
+```
+

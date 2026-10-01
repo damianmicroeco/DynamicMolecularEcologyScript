@@ -5,4 +5,8 @@ jobs/apptainers/*.sif
 jobs/old/
 jobs/__pycache__
 old/
+<<<<<<< HEAD
+=======
+model_genomes/
+>>>>>>> e06114a (Restructuring: movement and restructure on Fir cluster because of internet connection issues on Rorqual cluster)
 peripheral/apptainers/*.sif
