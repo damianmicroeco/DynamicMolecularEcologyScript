@@ -14,13 +14,20 @@ The goal of this script is to conduct a WGCNA. The assumed working directory is 
 
 ```{r}
 library(DESeq2)
+library(magrittr)
 library(WGCNA)
-library(flashClust)
+library(ggplot2)
+library(dplyr)
+library(limma)
+library(readr)
+library(tibble)
 ```
 
 ## Initialize Environment
 ```{r}
-raw_reads = ""
+genecountdir = "{directory containing STAR output}"
+read1suffix = "{suffix that is part of read 1}"
+meta_table = "{path to metadata}"
 ```
 
 ## Normalize Reads
@@ -103,6 +110,104 @@ dds = dds[keep,]
 vsd = vst(dds, blind = FALSE) #if setting `blind = TRUE`, within-group variability is calculated across ALL samples rather than within groups
 
 #transpose for wgcna (rows = samples, genes = columns)
-wgcna_input = t(assay(vsd))
+wgcna_input = as.data.frame(t(assay(vsd)))
 ```
 
+## Outlier Removal and Quality Control
+
+```{r}
+#Find genes and samples with a lot of missing values or zero-variance
+gsg = goodSamplesGenes(wgcna_input, verbose = 3)
+
+if (!gsg$allOK) {
+    #remove bad samples and genes
+    filt_input = wgcna_input[gsg$goodSamples, gsg$goodGenes]
+}
+
+#It is also recommended to remove outlier samples based on clustering. We leave this decision to the user.
+sample_clust = hclust(dist(filt_input), method = "average")
+plot(sample_clust, sub="", xlab="", cex.lab = 1.5)
+
+#If a sample looks like an outlier, you can remove it by uncommenting here and replacing `{OUTLIER}` with that sample's name.
+#filt_input = filt_input[-which(rownames(filt_input) == {OUTLIER}),]
+```
+
+## Choosing beta (soft-threshold power)
+WGCNA wants to achieve a scale-free topology pattern. This requires identifying a power (beta) that is used to transform the correlation matrix.
+The choice of beta will shape the identification of modules.
+
+```{r}
+#If you think the default betas of 1-20 are too low, you can create a vector of powers you want to try with the `powerVector` kwarg
+soft_threshold = pickSoftThreshold(filt_input,
+    dataIsExpr = TRUE,
+    corFnc = cor, #the correlation function
+    networkType = "signed"
+)
+
+#Let's visualize model fit to identify an appropriate beta. We first need to convert the outputs into a signed R-squared
+soft_threshold_df = data.frame(soft_threshold$fitIndices) %>%
+    dplyr::mutate(model_fit = -sign(slope) * SFT.R.sq)
+
+#the recommended WGCNA model_fit cutoff is 80%
+#if multiple values are above 0.8, you want to pick the one at the inflection point like when it starts to dip again 
+ggplot(soft_threshold_df, aes(x = Power, y = model_fit, label = Power)) +
+    geom_point() +
+    geom_text(nudge_y = 0.05) +
+    geom_hline(yintercept = 0.80, color = "#d78028") +
+    xlab("Soft Threshold (Power)") +
+    ylab("Scaled-Free Model Fit (signed R-squared)") +
+    theme_classic()
+```
+
+## WGCNA
+This will take some time when running. Grab a coffee. You deserve it.
+
+`maxBlockSize` can be increased based on how much RAM you have available. You can approximate it as:
+`maxBlockSize = (sqrt(RAM in GB)/2) * 10000`
+```{r}
+chosen_power = #the soft-threshold picked based on the graph above.
+
+bwnet = blockwiseModules (filt_input,
+    maxBlockSize = 15000,
+    TOMType = "signed",
+    power = chosen_power,
+    numericLabels = TRUE, #Use numbers instead of colors for module labels. I find this easier than trying to distinguish literal shades of brown
+    randomSeed = 42 #the data can be a little random, so setting a seed is useful to compare runs 
+)
+
+#That was a lot of hard work! To not have to run the above again, we can save the output to disk.
+write_rds(bwnet,file = "../processed_data/WGCNA_output.RDS")
+```
+
+## Exploring modules
+```{r}
+#This will produce a dataframe with samples as rows and module IDs as columns. Values in the matrix are the "collapsed, combined, and normalized expression of the genes that make up each module"
+module_eigengenes = bwnet$MEs
+
+#Are samples still in order?
+all.equal(meta_df$sample_name, rownames(module_eigengenes))
+
+#This should be TRUE, otherwise you need to match the orders
+
+#Create the design that the comparisons will be made on (i.e., the model with your predictor variable)
+design_matrix = model.matrix(~meta_df$group_id)
+
+#run linear models with each module as a response
+model_fit = lmFit(t(module_eigengenes, design = design_matrix))
+
+#smooth standard errors using empirical Bayes
+smooth_model = eBayes(model_fit)
+
+#multiple test correction and statistics extraction
+model_stats = topTable(smooth_model, number = ncol(module_eigengenes)) %>%
+    rownames_to_column("module")
+```
+
+`model_stats` is a dataframe in which every module has its own row with the log fold change in combined expression between groups, the Average Expression, the t-statistic, unadjusted p-value, adjusted p-value, and the log odds that the module is differentially expressed (B).
+
+## Matching genes to modules
+
+```{r}
+gene_module_key = enframe(bwnet$colors, name = "gene", value = "module") %>%
+    dplyr::mutate(module = paste0("ME", module))
+```
