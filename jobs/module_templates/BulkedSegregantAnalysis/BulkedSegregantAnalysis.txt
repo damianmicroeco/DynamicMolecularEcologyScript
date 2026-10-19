@@ -13,12 +13,8 @@ mkdir {{PROJECTDIR}}/${OUTDIR}
 #seed for consistency across runs
 SEED=1000
 
-#find which library size is larger between the high and low groups and then subsample the
 HIGHGROUP={{HIGHGROUP}}
 LOWGROUP={{LOWGROUP}}
-
-HIGHCOUNT=${APPTAINER_BSA samtools view -c ${HIGHGROUP}}
-LOWCOUNT=${APPTAINER_BSA samtools view -c ${LOWGROUP}}
 
 #resort to match naming conventions in pipeline
 FILE_ARRAY=($HIGHGROUP $LOWGROUP)
@@ -37,6 +33,10 @@ done
 
 HIGH_GROUP={{PROJECTDIR}}/bwa_align/sample000${HIGH_IDX}_analysis_ready.bam
 LOW_GROUP={{PROJECTDIR}}/bwa_align/sample000${LOW_IDX}_analysis_ready.bam
+
+#find which library size is larger between the high and low groups and then subsample the file with more reads
+HIGHCOUNT=${APPTAINER_BSA samtools view -c ${HIGH_GROUP}}
+LOWCOUNT=${APPTAINER_BSA samtools view -c ${LOW_GROUP}}
 
 #subsample data
 if (( HIGHCOUNT < LOWCOUNT ))
