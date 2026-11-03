@@ -4,15 +4,15 @@ library(optparse)
 library(ggplot2)
 library(dplyr)
 
-option_list <- list(
+option_list = list(
     make_option(c("-i", "--inputdir"), type = "character", help = "Directory where mosdepth outputs are stored"),
     make_option(c("-g", "--gtf"), type = "character", help = "GTF file of genome"),
     make_option(c("-o", "--output"), type = "character", help = "Output file"),
     make_option(c("-v", "--verbose"), action = "store_true", default = FALSE, help = "Print progress messages")
 )
 
-parser <- OptionParser(option_list = option_list, add_help_option = FALSE)
-args <- parse_args(parser)
+parser = OptionParser(option_list = option_list, add_help_option = FALSE)
+args = parse_args(parser)
 
 ## Initiating Variables
 inputdir = args$inputdir #directory containing mosdepth coverage
@@ -39,20 +39,23 @@ gtf_df$pos_mean = rowMeans(gtf_df[, c("V4", "V5")]) #we're getting the mean posi
 #calculate mean coverage for summary visualization
 df_mean = df %>%
   group_by(V2) %>%
-  summarise(cov_mean = mean(log(V4+1))
+  summarise(cov_mean = mean(log(V4+1)))
 
 #save visualization
-pdf(paste(output, "/coverage.svg", sep = ""))
-ggplot() +
-  geom_line(data = df, aes(x = V2, y = log(V4 + 1), group = source), alpha = 0.1) +
-  geom_line(data = df_mean, aes(x = V2, y = cov_mean, size = 1.5) +
-  geom_linerange(data = gtf_df, aes(xmin = V4, xmax = V5, y = -.2), linewidth = 1.5, color = "grey30") +
-  annotate("text", x = gtf_df$pos_mean, y = -.5, label = gtf_df$V9, angle = 30, size = 8/.pt) +
-  theme_minimal() +
-  xlab("Genome Position") +
-  ylab("ln(Coverage + 1)") +
-  facet_wrap(vars(V1), ncol = 1)
-dev.off()
+# pdf(paste(output, "/coverage.pdf", sep = ""))
+# ggplot() +
+#   geom_line(data = df, aes(x = V2, y = log(V4 + 1), group = source), alpha = 0.1) +
+#   geom_line(data = df_mean, aes(x = V2, y = cov_mean), linewidth = 1.5) +
+#   geom_linerange(data = gtf_df, aes(xmin = V4, xmax = V5, y = -.2), linewidth = 1.5, color = "grey30") +
+#   #geom_text(data = gtf_df, aes(x = pos_mean, y = -.5, label = V9), angle = 30, size = 8/.pt) +
+#   theme_minimal() +
+#   xlab("Genome Position") +
+#   ylab("ln(Coverage + 1)") +
+#   facet_wrap(vars(V1), ncol = 1)
+# dev.off()
+
+colnames(df) = c("chr", "window_start", "window_end", "coverage", "source")
+colnames(gtf_df) = c("chr", "detection", "gene", "start", "end", "score", "strand", "frame", "gene_name", "mean_coverage")
 
 #save files needed for recreating visualization in a different Rscript
 write.table(df, paste(output, "/combined_coverage_all_samples.tsv", sep = ""), row.names = FALSE, quote = FALSE, sep = "\t")

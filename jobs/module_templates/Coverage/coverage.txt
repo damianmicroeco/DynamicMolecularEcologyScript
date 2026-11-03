@@ -6,16 +6,17 @@ APPTAINER_MOSDEPTH="apptainer exec {{APPTAINER_DIR}}/Coverage.sif"
 
 #get coverage for all samples. Default is windows of 100 bp and quality thresholds of 30. Please feel free to change to values that fit your question
 mkdir {{PROJECTDIR}}/mosdepth_out/
-for i in $(ls {{PROJECTDIR}}/bwa_align/${i}_analysis_ready.bam)
+for i in $(ls {{PROJECTDIR}}/bwa_align/*_analysis_ready.bam)
 do
     #echo $i
     j="${i##*/}"
     #echo $j
-    $APPTAINER_MOSDEPTH -t {{CORES}} {{PROJECTDIR}}/mosdepth_out/$j -b {{WINDOWSIZE}} -Q {{QUALITY}} $i
+    $APPTAINER_MOSDEPTH mosdepth -t {{CORES}} {{PROJECTDIR}}/mosdepth_out/$j -b {{WINDOWSIZE}} -Q {{QUALITY}} $i
 done
 
 #gunzip all of the regions.bed files
-gunzip {{PROJECTDIR}}/mosdepth_out/*regions.bed.gz
+find . -regextype posix-extended -regex '{{PROJECTDIR}}/mosdepth_out/*regions.bed\.gz' -exec gunzip {} +
+
 
 #Visualize coverage across whole genome using coverage.R script
 $APPTAINER_MOSDEPTH Rscript {{TEMPLATE_DIR}}/Coverage/coverage.R \
@@ -32,7 +33,8 @@ echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "The visualization script above visualizes coverage across the ENTIRE genome, split up by scaffold/chromosome. If you would like to highlight certain regions/scaffolds, please feel free to copy the coverage.R script in a new file and modify to select for just that region. The R script above produces the necessary input tables."
+echo "The R script above produces the necessary input tables to visualize results independently."
+echo "The most important is `filtered_gtf_for_plotting.tsv`."
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

@@ -37,5 +37,5 @@ do
     
     $APPTAINER_ALIGNER samtools markdup -@ {{CORES}} -s {{PROJECTDIR}}/bwa_align/${col[2]}_align_sort.bam {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam
 
-    $APPTAINER_ALIGNER samtools index -b -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam --output {{PROJECTDIR}}/bwa_align/${col[2]}_indexed_analysis_ready.bai
+    $APPTAINER_ALIGNER samtools index -b -@ {{CORES}} {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bam --output {{PROJECTDIR}}/bwa_align/${col[2]}_analysis_ready.bai
 done < {{PROJECTDIR}}/bwa_manifest.txt
