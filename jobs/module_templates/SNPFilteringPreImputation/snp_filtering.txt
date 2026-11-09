@@ -7,12 +7,13 @@ APPTAINER_SNP="apptainer exec {{APPTAINER_DIR}}/SNP.sif"
 INPUT_VCF="{{PROJECTDIR}}/snp_calling/variants.vcf.gz"
 SNP_VCF="{{PROJECTDIR}}/snp_processing/snp_unfiltered.vcf.gz"
 INDEL_VCF="{{PROJECTDIR}}/snp_processing/indel_unfiltered.vcf.gz"
+MASKED_VCF="{{PROJECTDIR}}/snp_processing/masked_snps.vcf.gz"
 FILT_VCF="{{PROJECTDIR}}/snp_processing/snp_filtered_preimputation.vcf.gz"
 
 #create folder to store processed vcf files
 mkdir {{PROJECTDIR}}/snp_processing
 
-get just SNPs (remove indels and structural variants)
+#get just SNPs (remove indels and structural variants)
 $APPTAINER_SNP bcftools view "$INPUT_VCF" \
     --threads {{CORES}} \
     --types snps \
