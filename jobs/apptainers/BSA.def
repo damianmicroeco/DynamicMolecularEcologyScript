@@ -1,0 +1,39 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+   
+%files
+    BSA.yml
+   
+%environment
+   
+%post
+    ENV_NAME=BSA
+
+    . /opt/conda/etc/profile.d/conda.sh
+
+    conda env create -f BSA.yml -p /opt/conda/envs/$ENV_NAME
+
+    conda activate /opt/conda/envs/$ENV_NAME
+
+    # Verify make is available
+    which make
+    make --version
+
+    # Verify R can find make
+    Rscript -e 'Sys.which("make")'
+    Rscript -e 'Sys.getenv("PATH")'
+
+    # Install R packages
+    Rscript -e 'BiocManager::install("GenomicRanges", ask=FALSE, update=FALSE, version="3.22")'
+
+    Rscript -e 'devtools::install_github("bmansfeld/QTLseqr", upgrade="never")'
+    
+    Rscript -e 'install.packages("gaston", repos="https://cloud.r-project.org")'
+    Rscript -e 'install.packages("snpsettest", repos = "https://cloud.r-project.org")'
+
+    conda clean --all
+
+%runscript
+    exec "$@"
+
+

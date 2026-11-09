@@ -1,0 +1,152 @@
+#
+# Bulked Segregant Analysis
+#
+
+APPTAINER_BSA="apptainer exec {{APPTAINER_DIR}}/BSA.sif"
+
+#Please note that SNP calling is called separately for a BSA than for the other population genetic analysis widgets because statistics like G' are highly sensitive to uneven library sizes. Thus we need to do subsampling to equalize libraries before calling variants.
+
+OUTDIR=bsa_out
+
+mkdir {{PROJECTDIR}}/${OUTDIR}
+
+#seed for consistency across runs
+SEED=1000
+
+HIGHGROUP={{HIGHGROUP}}
+LOWGROUP={{LOWGROUP}}
+
+#resort to match naming conventions in pipeline
+FILE_ARRAY=($HIGHGROUP $LOWGROUP)
+SORTED_ARRAY=($(printf "%s\n" "${FILE_ARRAY[@]}" | sort))
+HIGH_IDX=-1
+LOW_IDX=-1
+
+for i in "${!FILE_ARRAY[@]}"; do
+    if [[ "${FILE_ARRAY[$i]}" == "highgroup" ]]; then
+        HIGH_IDX=$((i+1))
+    fi
+    if [[ "${FILE_ARRAY[$i]}" == "lowgroup" ]]; then
+        LOW_IDX=$((i+1))
+    fi
+done
+
+HIGH_GROUP={{PROJECTDIR}}/bwa_align/sample000${HIGH_IDX}_analysis_ready.bam
+LOW_GROUP={{PROJECTDIR}}/bwa_align/sample000${LOW_IDX}_analysis_ready.bam
+
+#find which library size is larger between the high and low groups and then subsample the file with more reads
+HIGHCOUNT=${APPTAINER_BSA samtools view -c ${HIGH_GROUP}}
+LOWCOUNT=${APPTAINER_BSA samtools view -c ${LOW_GROUP}}
+
+#subsample data
+if (( HIGHCOUNT < LOWCOUNT ))
+then
+    FRACTION=$(echo "scale=2; $HIGHCOUNT / $LOWCOUNT" | bc)
+    $APPTAINER_BSA samtools view -b -s ${SEED}.${FRACTION} $LOW_GROUP > {{PROJECTDIR}}/${OUTDIR}/low_group.bam
+    cp $HIGH_GROUP {{PROJECTDIR}}/${OUTDIR}/high_group.bam
+else
+    FRACTION=$(echo "scale=2; $LOWCOUNT / $HIGHCOUNT" | bc)
+    $APPTAINER_BSA samtools view -b -s ${SEED}.${FRACTION} $HIGH_GROUP > {{PROJECTDIR}}/${OUTDIR}/high_group.bam
+    cp $LOW_GROUP {{PROJECTDIR}}/${OUTDIR}/low_group.bam
+fi
+
+#Index fasta genome, and create dictionary. It is simpler if we copy the genome to our project directory and make the dictionary in the same place
+mkdir {{PROJECTDIR}}/genome_dictionary
+cp {{REFGENOME}} {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
+
+$APPTAINER_BSA samtools faidx {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
+$APPTAINER_BSA gatk CreateSequenceDictionary \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+	-O {{PROJECTDIR}}/genome_dictionary/reference_genome.dict
+
+$APPTAINER_BSA gatk AddOrReplaceReadGroups \
+	-I {{PROJECTDIR}}/${OUTDIR}/high_group.bam \
+	-O {{PROJECTDIR}}/snp_calling/{{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam \
+	-RGSM HIGH \
+	-RGPU unit1 \
+	-RGPL HIGH \
+	-RGLB HIGH \
+	-SO coordinate
+	
+$APPTAINER_BSA gatk AddOrReplaceReadGroups \
+	-I {{PROJECTDIR}}/${OUTDIR}/low_group.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/low_group_withsm.bam \
+	-RGSM LOW \
+	-RGPU unit1 \
+	-RGPL LOW \
+	-RGLB LOW \
+	-SO coordinate
+
+$APPTAINER_BSA gatk GetSampleName \
+	-I {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.txt
+
+$APPTAINER_BSA gatk GetSampleName \
+	-I {{PROJECTDIR}}/snp_calling/low_group_withsm.bam \
+	-O {{PROJECTDIR}}/snp_calling/low_group_withsm.txt
+
+#index bam files that have had sample names added
+$APPTAINER_BSA samtools index -@ {{CORES}} {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam
+$APPTAINER_BSA samtools index -@ {{CORES}} {{PROJECTDIR}}/${OUTDIR}/low_group_withsm.bam
+
+#Call SNPs
+$APPTAINER_BSA gatk HaplotypeCaller \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+	--java-options "-Xmx{{MAXRAM}}g" \
+	-I {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/high_group.g.vcf.gz \
+	--native-pair-hmm-threads {{CORES}} \
+	-ploidy 2 \
+	-ERC GVCF
+
+$APPTAINER_BSA gatk HaplotypeCaller \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
+	--java-options "-Xmx{{MAXRAM}}g" \
+	-I {{PROJECTDIR}}/${OUTDIR}/low_group_withsm.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/low_group.g.vcf.gz \
+	--native-pair-hmm-threads {{CORES}} \
+	-ploidy 2 \
+	-ERC GVCF
+
+#combine vcf files
+$APPTAINER_BSA gatk CombineGVCFs \
+	-R {{REFGENOME}} \
+	--variant {{PROJECTDIR}}/${OUTDIR}/high_group.g.vcf.gz \
+	--variant {{PROJECTDIR}}/${OUTDIR}/low_group.g.vcf.gz \
+	-O {{PROJECTDIR}}/${OUTDIR}/combined.vcf
+
+#Convert VCF to Table
+$APPTAINER_BSA gatk VariantsToTable \
+   -V {{PROJECTDIR}}/${OUTDIR}/combined.vcf \
+   -F CHROM -F POS -F REF -F ALT \
+   -GF AD -GF DP -GF GQ -GF PL\
+   -R {{REFGENOME}} \
+   -O {{PROJECTDIR}}/${OUTDIR}/variant_table.tsv
+
+#run QTLSeqR analysis (this will provide results for both deltaSNP and Gprime analyses)
+#-f, -d, -e, -s, and -q are best determined after assessing the 'depth_histogram', 'ref_allel_frequency', 'high_bulk_distribution', and 'low_distribution_plots' through the script below.
+#Thus, use the defaults provided for a first pass to determine more appropriate cutoffs (the defaults are often good enough for a first pass analysis) and replace the values here.
+$APPTAINER_BSA RScript {{TEMPLATE_DIR}}/BulkedSegregantAnalysis/BulkedSegregantAnalysis.R \
+    -v {{PROJECTDIR}}/${OUTDIR}/variant_table.tsv \
+    -n {{CHROM_COUNT}} \
+    -c {{CHROM_PREFIX}} \
+    -g {{GTF}} \
+    -o {{PROJECTDIR}}/${OUTDIR} \
+    -a {{GPRIME_ALPHA}} \
+	-f {{ALLELE_FREQ}} \
+	-d {{MIN_TOTDEPTH}} \
+	-e {{MAX_TOTDEPTH}} \
+	-s {{MIN_SAMDEPTH}} \
+	-q {{GQ}}
+
+    #-v: Path to output of GATK VariantsToTable Function
+    #-n: Number of chromosomes
+    #-c: Prefix of chromosome names
+    #-g: Path to reference genome's GTF
+    #-o: Path to output directory
+    #-a: Alpha cut-off for Gprime statistic
+	#-f: Reference allele frequency for QTLSeqR SNP filtering
+	#-d: Minimum total depth for QTLSeqR SNP filtering
+	#-e: Maximum total depth for QTLSeqR SNP filtering
+	#-s: Minimum sample depth for QTLSeqR SNP filtering
+	#-q: Minimum GQ for QTLSeqR SNP filtering
