@@ -8,7 +8,7 @@ APPTAINER_BSA="apptainer exec {{APPTAINER_DIR}}/BSA.sif"
 
 OUTDIR=bsa_out
 
-mkdir {{PROJECTDIR}}/${OUTDIR}
+mkdir -p {{PROJECTDIR}}/${OUTDIR}
 
 #seed for consistency across runs
 SEED=1000
@@ -22,21 +22,37 @@ SORTED_ARRAY=($(printf "%s\n" "${FILE_ARRAY[@]}" | sort))
 HIGH_IDX=-1
 LOW_IDX=-1
 
-for i in "${!FILE_ARRAY[@]}"; do
-    if [[ "${FILE_ARRAY[$i]}" == "highgroup" ]]; then
-        HIGH_IDX=$((i+1))
-    fi
-    if [[ "${FILE_ARRAY[$i]}" == "lowgroup" ]]; then
-        LOW_IDX=$((i+1))
-    fi
+
+#Find the index corresponding to each original filename
+for i in "${!SORTED_ARRAY[@]}"; do
+    for file in $HIGHGROUP; do
+        if [[ "${SORTED_ARRAY[$i]}" == "$file" ]]; then
+            HIGH_IDX=$((i+1))
+        fi
+    done
+    for file in $LOWGROUP; do
+        if [[ "${SORTED_ARRAY[$i]}" == "$file" ]]; then
+            LOW_IDX=$((i+1))
+        fi
+    done
 done
 
-HIGH_GROUP={{PROJECTDIR}}/bwa_align/sample000${HIGH_IDX}_analysis_ready.bam
-LOW_GROUP={{PROJECTDIR}}/bwa_align/sample000${LOW_IDX}_analysis_ready.bam
+if (( HIGH_IDX < 1 || LOW_IDX < 1 )); then
+    echo "ERROR: Could not map high and low group filenames to sample indices."
+    exit 1
+fi
+
+HIGH_GROUP=$(printf "{{PROJECTDIR}}/bwa_align/sample%04d_analysis_ready.bam" "$HIGH_IDX")
+LOW_GROUP=$(printf "{{PROJECTDIR}}/bwa_align/sample%04d_analysis_ready.bam" "$LOW_IDX")
+
+if [[ ! -f "$HIGH_GROUP" || ! -f "$LOW_GROUP" ]]; then
+    echo "ERROR: One or both BAM files could not be found."
+    exit 1
+fi
 
 #find which library size is larger between the high and low groups and then subsample the file with more reads
-HIGHCOUNT=${APPTAINER_BSA samtools view -c ${HIGH_GROUP}}
-LOWCOUNT=${APPTAINER_BSA samtools view -c ${LOW_GROUP}}
+HIGHCOUNT=$($APPTAINER_BSA samtools view -c -F 0x900 "$HIGH_GROUP")
+LOWCOUNT=$($APPTAINER_BSA samtools view -c -F 0x900 "$LOW_GROUP")
 
 #subsample data
 if (( HIGHCOUNT < LOWCOUNT ))
@@ -51,7 +67,7 @@ else
 fi
 
 #Index fasta genome, and create dictionary. It is simpler if we copy the genome to our project directory and make the dictionary in the same place
-mkdir {{PROJECTDIR}}/genome_dictionary
+mkdir -p {{PROJECTDIR}}/genome_dictionary
 cp {{REFGENOME}} {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
 
 $APPTAINER_BSA samtools faidx {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta
@@ -61,7 +77,7 @@ $APPTAINER_BSA gatk CreateSequenceDictionary \
 
 $APPTAINER_BSA gatk AddOrReplaceReadGroups \
 	-I {{PROJECTDIR}}/${OUTDIR}/high_group.bam \
-	-O {{PROJECTDIR}}/snp_calling/{{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam \
 	-RGSM HIGH \
 	-RGPU unit1 \
 	-RGPL HIGH \
@@ -82,8 +98,8 @@ $APPTAINER_BSA gatk GetSampleName \
 	-O {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.txt
 
 $APPTAINER_BSA gatk GetSampleName \
-	-I {{PROJECTDIR}}/snp_calling/low_group_withsm.bam \
-	-O {{PROJECTDIR}}/snp_calling/low_group_withsm.txt
+	-I {{PROJECTDIR}}/${OUTDIR}/low_group_withsm.bam \
+	-O {{PROJECTDIR}}/${OUTDIR}/low_group_withsm.txt
 
 #index bam files that have had sample names added
 $APPTAINER_BSA samtools index -@ {{CORES}} {{PROJECTDIR}}/${OUTDIR}/high_group_withsm.bam
@@ -110,7 +126,7 @@ $APPTAINER_BSA gatk HaplotypeCaller \
 
 #combine vcf files
 $APPTAINER_BSA gatk CombineGVCFs \
-	-R {{REFGENOME}} \
+	-R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
 	--variant {{PROJECTDIR}}/${OUTDIR}/high_group.g.vcf.gz \
 	--variant {{PROJECTDIR}}/${OUTDIR}/low_group.g.vcf.gz \
 	-O {{PROJECTDIR}}/${OUTDIR}/combined.vcf
@@ -120,7 +136,7 @@ $APPTAINER_BSA gatk VariantsToTable \
    -V {{PROJECTDIR}}/${OUTDIR}/combined.vcf \
    -F CHROM -F POS -F REF -F ALT \
    -GF AD -GF DP -GF GQ -GF PL\
-   -R {{REFGENOME}} \
+   -R {{PROJECTDIR}}/genome_dictionary/reference_genome.fasta \
    -O {{PROJECTDIR}}/${OUTDIR}/variant_table.tsv
 
 #run QTLSeqR analysis (this will provide results for both deltaSNP and Gprime analyses)
